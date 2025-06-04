@@ -1,5 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 import { Product, Customer, CartItem, Sale, User } from '@/types/pos';
 
 interface PosContextType {
@@ -28,26 +28,17 @@ interface PosContextType {
   
   // Sales
   sales: Sale[];
-  completeSale: (sale: Omit<Sale, 'id'>) => void;
-  
-  // Current user
-  currentUser: User | null;
-  setCurrentUser: (user: User | null) => void;
+  completeSale: (sale: Omit<Sale, 'id' | 'userId' | 'receiptNumber'>) => void;
 }
 
 const PosContext = createContext<PosContextType | undefined>(undefined);
 
 export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser, addCashEntry } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>({
-    id: '1',
-    name: 'Admin User',
-    email: 'admin@pos.com',
-    role: 'admin'
-  });
 
   // Initialize with sample data
   useEffect(() => {
@@ -91,6 +82,34 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         stock: 15,
         minStock: 10,
         category: 'Panadería',
+        taxRate: 0.18,
+        image: '/placeholder.svg'
+      },
+      {
+        id: '4',
+        name: 'Refresco Cola 355ml',
+        description: 'Bebida carbonatada sabor cola',
+        barcode: '7501234567893',
+        sku: 'REF-001',
+        price: 45.00,
+        cost: 25.00,
+        stock: 50,
+        minStock: 15,
+        category: 'Bebidas',
+        taxRate: 0.18,
+        image: '/placeholder.svg'
+      },
+      {
+        id: '5',
+        name: 'Galletas de Chocolate',
+        description: 'Paquete de galletas con chips de chocolate',
+        barcode: '7501234567894',
+        sku: 'GAL-001',
+        price: 120.00,
+        cost: 80.00,
+        stock: 30,
+        minStock: 8,
+        category: 'Snacks',
         taxRate: 0.18,
         image: '/placeholder.svg'
       }
@@ -195,9 +214,30 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartTotal = cartSubtotal + cartTax;
 
   // Sales functions
-  const completeSale = (sale: Omit<Sale, 'id'>) => {
-    const newSale = { ...sale, id: Date.now().toString() };
+  const completeSale = (sale: Omit<Sale, 'id' | 'userId' | 'receiptNumber'>) => {
+    if (!currentUser) return;
+
+    const receiptNumber = `R${Date.now()}`;
+    const newSale: Sale = { 
+      ...sale, 
+      id: Date.now().toString(),
+      userId: currentUser.id,
+      receiptNumber
+    };
+    
     setSales(prev => [...prev, newSale]);
+    
+    // Registrar entrada de efectivo si hay pagos en efectivo
+    const cashPayments = sale.payments.filter(p => p.type === 'cash');
+    if (cashPayments.length > 0) {
+      const totalCash = cashPayments.reduce((sum, p) => sum + p.amount, 0);
+      addCashEntry({
+        type: 'sale',
+        amount: totalCash,
+        description: `Venta ${receiptNumber}`,
+        userId: currentUser.id
+      });
+    }
     
     // Update product stock
     cart.forEach(item => {
@@ -229,9 +269,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cartSubtotal,
       cartTax,
       sales,
-      completeSale,
-      currentUser,
-      setCurrentUser
+      completeSale
     }}>
       {children}
     </PosContext.Provider>
