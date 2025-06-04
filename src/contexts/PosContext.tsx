@@ -1,7 +1,7 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { Product, Customer, CartItem, Sale, User } from '@/types/pos';
+import { Product, Customer, CartItem, Sale } from '@/types/pos';
+import { User } from '@/types/auth';
 
 interface PosContextType {
   // Products
