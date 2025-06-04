@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import ProductSearch from '@/components/sales/ProductSearch';
@@ -78,7 +77,7 @@ const Sales = () => {
           {/* Product Search */}
           <div className="lg:col-span-2">
             <Card className="p-6">
-              <ProductSearch onAddToCart={handleAddProduct} />
+              <ProductSearch />
               
               {/* Wholesale Pricing Toggle */}
               <div className="flex items-center justify-end mt-4 gap-2 border-t pt-4">

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod } from '@/types/pos';
@@ -298,7 +297,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Register cash entry if payment was cash
     if (paymentMethod.type === 'cash' && currentUser) {
       addCashEntry({
-        type: 'credit-payment',
+        type: 'sale',
         amount: paymentAmount,
         description: `Pago de crédito ${saleId}`,
         userId: currentUser.id

@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Customer, Sale } from '@/types/pos';
 import { usePos } from '@/contexts/PosContext';
-import { FilePrinted, Wallet } from 'lucide-react';
+import { Printer, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -129,7 +128,7 @@ const CustomerAccountStatement: React.FC<CustomerAccountStatementProps> = ({
               Cerrar
             </Button>
             <Button onClick={printStatement}>
-              <FilePrinted className="h-4 w-4 mr-2" />
+              <Printer className="h-4 w-4 mr-2" />
               Imprimir Estado de Cuenta
             </Button>
           </div>

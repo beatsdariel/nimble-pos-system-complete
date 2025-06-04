@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -121,7 +120,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const completeSaleTransaction = () => {
     if (remaining <= 0 && cart.length > 0 && currentUser) {
-      const sale = {
+      const saleStatus: Sale['status'] = payments.some(p => p.type === 'credit') ? 'credit' : 'completed';
+      
+      const sale: Omit<Sale, 'id'> = {
         date: new Date().toISOString(),
         items: [...cart],
         subtotal: cartSubtotal,
@@ -131,7 +132,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         customerId: selectedCustomer?.id,
         userId: currentUser.id,
         receiptNumber: `REC-${Date.now()}`,
-        status: payments.some(p => p.type === 'credit') ? 'credit' : 'completed',
+        status: saleStatus,
         ...(payments.some(p => p.type === 'credit') && { dueDate: getNextMonth() })
       };
 
