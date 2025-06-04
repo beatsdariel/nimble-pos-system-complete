@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { Product, Customer, CartItem, Sale, User } from '@/types/pos';
@@ -29,6 +30,9 @@ interface PosContextType {
   // Sales
   sales: Sale[];
   completeSale: (sale: Omit<Sale, 'id' | 'userId' | 'receiptNumber'>) => void;
+  
+  // User (added property)
+  currentUser: User | null;
 }
 
 const PosContext = createContext<PosContextType | undefined>(undefined);
@@ -269,7 +273,8 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cartSubtotal,
       cartTax,
       sales,
-      completeSale
+      completeSale,
+      currentUser // Add the currentUser to the context value
     }}>
       {children}
     </PosContext.Provider>
