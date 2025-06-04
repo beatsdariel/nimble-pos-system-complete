@@ -7,15 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePos } from '@/contexts/PosContext';
 import { PaymentMethod } from '@/types/pos';
-import { CreditCard, DollarSign, Banknote, Receipt } from 'lucide-react';
+import { Customer } from '@/types/pos';
+import { CreditCard, DollarSign, Banknote, Receipt, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PaymentModalProps {
   open: boolean;
   onClose: () => void;
+  selectedCustomer?: Customer | null;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCustomer }) => {
   const { cart, cartTotal, cartSubtotal, cartTax, completeSale, currentUser } = usePos();
   const [payments, setPayments] = useState<PaymentMethod[]>([]);
   const [cashAmount, setCashAmount] = useState<string>('');
@@ -28,6 +30,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose }) => {
 
   const addPayment = (payment: PaymentMethod) => {
     setPayments(prev => [...prev, payment]);
+  };
+
+  const handleExactCashPayment = () => {
+    if (remaining > 0) {
+      addPayment({ type: 'cash', amount: remaining });
+      setCashAmount('');
+    }
   };
 
   const handleCashPayment = () => {
@@ -60,6 +69,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose }) => {
         tax: cartTax,
         total: cartTotal,
         payments: [...payments],
+        customerId: selectedCustomer?.id,
         userId: currentUser.id,
         receiptNumber: `REC-${Date.now()}`
       };
@@ -86,7 +96,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose }) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5" />
@@ -120,9 +130,27 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose }) => {
                     onChange={(e) => setCashAmount(e.target.value)}
                   />
                 </div>
-                <Button onClick={handleCashPayment} className="w-full">
-                  Agregar Pago en Efectivo
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={handleCashPayment} className="flex-1">
+                    <Banknote className="h-4 w-4 mr-2" />
+                    Agregar Pago
+                  </Button>
+                  {remaining > 0 && (
+                    <Button 
+                      onClick={handleExactCashPayment} 
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Pago Exacto
+                    </Button>
+                  )}
+                </div>
+                {remaining > 0 && (
+                  <div className="text-sm text-gray-600 bg-yellow-50 p-2 rounded">
+                    💡 <strong>Pago exacto:</strong> RD$ {remaining.toLocaleString()}
+                  </div>
+                )}
               </TabsContent>
               
               <TabsContent value="card" className="space-y-4">
@@ -154,6 +182,22 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose }) => {
 
           {/* Payment Summary */}
           <div className="space-y-4">
+            {/* Customer Info */}
+            {selectedCustomer && (
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-medium mb-2">Cliente</h3>
+                <div className="text-sm space-y-1">
+                  <p className="font-medium">{selectedCustomer.name}</p>
+                  {selectedCustomer.document && (
+                    <p className="text-gray-600">{selectedCustomer.document}</p>
+                  )}
+                  {selectedCustomer.email && (
+                    <p className="text-gray-600">{selectedCustomer.email}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-medium mb-3">Resumen de Venta</h3>
               <div className="space-y-2 text-sm">
@@ -173,7 +217,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose }) => {
             </div>
 
             {payments.length > 0 && (
-              <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="bg-green-50 p-4 rounded-lg">
                 <h3 className="font-medium mb-3">Pagos Registrados</h3>
                 <div className="space-y-2 text-sm">
                   {payments.map((payment, index) => (
