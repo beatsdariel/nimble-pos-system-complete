@@ -5,13 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import CustomerModal from '@/components/customers/CustomerModal';
+import CustomerAccountStatement from '@/components/customers/CustomerAccountStatement';
 import { usePos } from '@/contexts/PosContext';
-import { Users, Plus, Search, Edit, Phone, Mail } from 'lucide-react';
+import { Users, Plus, Search, Edit, Phone, Mail, CreditCard, Wallet } from 'lucide-react';
+import { Customer } from '@/types/pos';
 
 const Customers = () => {
   const { customers } = usePos();
   const [showModal, setShowModal] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [showAccountStatement, setShowAccountStatement] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredCustomers = customers.filter(customer =>
@@ -21,7 +25,7 @@ const Customers = () => {
     customer.document?.includes(searchTerm)
   );
 
-  const handleEdit = (customer: any) => {
+  const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
     setShowModal(true);
   };
@@ -29,6 +33,11 @@ const Customers = () => {
   const handleNew = () => {
     setEditingCustomer(null);
     setShowModal(true);
+  };
+
+  const handleViewAccountStatement = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setShowAccountStatement(true);
   };
 
   return (
@@ -104,6 +113,41 @@ const Customers = () => {
                         {customer.address}
                       </p>
                     )}
+                    
+                    {(customer.creditLimit !== undefined) && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-1 text-sm">
+                            <CreditCard className="h-3 w-3" />
+                            <span>Crédito:</span>
+                          </div>
+                          <span className="text-sm font-medium">
+                            RD$ {customer.creditLimit.toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        {(customer.creditBalance !== undefined && customer.creditBalance > 0) && (
+                          <div className="flex justify-between items-center mt-1">
+                            <div className="flex items-center gap-1 text-sm">
+                              <span>Balance:</span>
+                            </div>
+                            <span className="text-sm font-medium text-red-600">
+                              RD$ {customer.creditBalance.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full mt-2"
+                          onClick={() => handleViewAccountStatement(customer)}
+                        >
+                          <Wallet className="h-3 w-3 mr-1" />
+                          Estado de Cuenta
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -126,6 +170,12 @@ const Customers = () => {
         open={showModal}
         onClose={() => setShowModal(false)}
         customer={editingCustomer}
+      />
+      
+      <CustomerAccountStatement
+        open={showAccountStatement}
+        onClose={() => setShowAccountStatement(false)}
+        customer={selectedCustomer}
       />
     </Layout>
   );

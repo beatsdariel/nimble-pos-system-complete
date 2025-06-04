@@ -4,16 +4,21 @@ import Layout from '@/components/Layout';
 import ProductSearch from '@/components/sales/ProductSearch';
 import ShoppingCart from '@/components/sales/ShoppingCart';
 import PaymentModal from '@/components/sales/PaymentModal';
+import SalesHistory from '@/components/sales/SalesHistory';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePos } from '@/contexts/PosContext';
-import { ShoppingCart as CartIcon, CreditCard, User } from 'lucide-react';
+import { ShoppingCart as CartIcon, CreditCard, User, History, Tag } from 'lucide-react';
 
 const Sales = () => {
-  const { cart, cartTotal, customers } = usePos();
+  const { cart, cartTotal, customers, addToCart, products } = usePos();
   const [showPayment, setShowPayment] = useState(false);
+  const [showSalesHistory, setShowSalesHistory] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('no-customer');
+  const [useWholesalePrices, setUseWholesalePrices] = useState(false);
+  const [returnData, setReturnData] = useState<{ returnAmount: number, returnId: string } | null>(null);
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
@@ -24,19 +29,72 @@ const Sales = () => {
     ? customers.find(c => c.id === selectedCustomer) 
     : null;
 
+  // Handle customer selection and automatically set wholesale pricing based on customer type
+  const handleCustomerChange = (customerId: string) => {
+    setSelectedCustomer(customerId);
+    if (customerId === 'no-customer') {
+      setUseWholesalePrices(false);
+    } else {
+      const customer = customers.find(c => c.id === customerId);
+      if (customer?.isWholesale) {
+        setUseWholesalePrices(true);
+      }
+    }
+  };
+
+  // Handle product quantity addition with wholesale price
+  const handleAddProduct = (productId: string, quantity: number) => {
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      addToCart(product, quantity, useWholesalePrices);
+    }
+  };
+
+  // Handle return selection from sales history
+  const handleReturnSelection = (returnAmount: number, returnId: string) => {
+    setReturnData({ returnAmount, returnId });
+    setShowPayment(true);
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Punto de Venta</h1>
-          <p className="text-gray-600">Procesa transacciones de venta</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Punto de Venta</h1>
+            <p className="text-gray-600">Procesa transacciones de venta</p>
+          </div>
+          <Button 
+            variant="outline"
+            onClick={() => setShowSalesHistory(true)}
+            className="flex items-center gap-2"
+          >
+            <History className="h-4 w-4" />
+            Historial de Ventas
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Product Search */}
           <div className="lg:col-span-2">
             <Card className="p-6">
-              <ProductSearch />
+              <ProductSearch onAddToCart={handleAddProduct} />
+              
+              {/* Wholesale Pricing Toggle */}
+              <div className="flex items-center justify-end mt-4 gap-2 border-t pt-4">
+                <span className="text-sm text-gray-600">Precios Mayoristas</span>
+                <Switch 
+                  checked={useWholesalePrices} 
+                  onCheckedChange={setUseWholesalePrices}
+                  disabled={selectedCustomer !== 'no-customer' && !selectedCustomerData?.isWholesale}
+                />
+                {useWholesalePrices && (
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    <Tag className="h-3 w-3 mr-1" />
+                    Mayorista
+                  </span>
+                )}
+              </div>
             </Card>
           </div>
 
@@ -54,7 +112,7 @@ const Sales = () => {
                   <User className="h-4 w-4 inline mr-1" />
                   Cliente (Opcional)
                 </label>
-                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                <Select value={selectedCustomer} onValueChange={handleCustomerChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar cliente..." />
                   </SelectTrigger>
@@ -63,7 +121,10 @@ const Sales = () => {
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         <div className="flex flex-col">
-                          <span className="font-medium">{customer.name}</span>
+                          <span className="font-medium">
+                            {customer.name}
+                            {customer.isWholesale && ' (Mayorista)'}
+                          </span>
                           {customer.document && (
                             <span className="text-xs text-gray-500">{customer.document}</span>
                           )}
@@ -81,6 +142,14 @@ const Sales = () => {
                     {selectedCustomerData.phone && (
                       <p className="text-gray-600">{selectedCustomerData.phone}</p>
                     )}
+                    {selectedCustomerData.isWholesale && (
+                      <p className="text-blue-600 font-medium">Cliente Mayorista</p>
+                    )}
+                    {(selectedCustomerData.creditLimit !== undefined && selectedCustomerData.creditLimit > 0) && (
+                      <p className="text-green-600">
+                        Crédito: RD$ {(selectedCustomerData.creditLimit - (selectedCustomerData.creditBalance || 0)).toLocaleString()} disponible
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -94,6 +163,13 @@ const Sales = () => {
                       <span>Total:</span>
                       <span>RD$ {cartTotal.toLocaleString()}</span>
                     </div>
+                    
+                    {returnData && returnData.returnAmount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Devolución aplicada:</span>
+                        <span>- RD$ {returnData.returnAmount.toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
                   
                   <Button 
@@ -113,8 +189,19 @@ const Sales = () => {
 
       <PaymentModal 
         open={showPayment} 
-        onClose={() => setShowPayment(false)}
+        onClose={() => {
+          setShowPayment(false);
+          setReturnData(null);
+        }}
         selectedCustomer={selectedCustomerData}
+        returnAmount={returnData?.returnAmount}
+        returnId={returnData?.returnId}
+      />
+      
+      <SalesHistory
+        open={showSalesHistory}
+        onClose={() => setShowSalesHistory(false)}
+        onSelectReturn={handleReturnSelection}
       />
     </Layout>
   );

@@ -1,32 +1,65 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePos } from '@/contexts/PosContext';
-import { PaymentMethod } from '@/types/pos';
-import { Customer } from '@/types/pos';
-import { CreditCard, DollarSign, Banknote, Receipt, Zap } from 'lucide-react';
+import { PaymentMethod, Customer, Sale } from '@/types/pos';
+import { CreditCard, DollarSign, Banknote, Receipt, Zap, Calendar, ArrowLeftCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface PaymentModalProps {
   open: boolean;
   onClose: () => void;
   selectedCustomer?: Customer | null;
+  returnAmount?: number;
+  returnId?: string;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCustomer }) => {
-  const { cart, cartTotal, cartSubtotal, cartTax, completeSale, currentUser } = usePos();
+const PaymentModal: React.FC<PaymentModalProps> = ({ 
+  open, 
+  onClose, 
+  selectedCustomer,
+  returnAmount = 0,
+  returnId
+}) => {
+  const { cart, cartTotal, cartSubtotal, cartTax, completeSale, currentUser, customers } = usePos();
   const [payments, setPayments] = useState<PaymentMethod[]>([]);
   const [cashAmount, setCashAmount] = useState<string>('');
   const [cardAmount, setCardAmount] = useState<string>('');
   const [cardReference, setCardReference] = useState<string>('');
+  const [useCredit, setUseCredit] = useState<boolean>(false);
+  const [returnPayment, setReturnPayment] = useState<boolean>(returnAmount > 0);
 
+  // Calculate totals considering return amount
+  const totalAfterReturn = Math.max(0, cartTotal - returnAmount);
   const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const remaining = cartTotal - totalPaid;
-  const change = totalPaid > cartTotal ? totalPaid - cartTotal : 0;
+  const remaining = totalAfterReturn - totalPaid;
+  const change = totalPaid > totalAfterReturn ? totalPaid - totalAfterReturn : 0;
+
+  // Reset payment state when the modal is opened/closed
+  useEffect(() => {
+    if (open) {
+      setPayments([]);
+      setCashAmount('');
+      setCardAmount('');
+      setCardReference('');
+      setUseCredit(false);
+      
+      if (returnAmount > 0 && returnId) {
+        // Automatically apply return amount as payment
+        setReturnPayment(true);
+        setPayments([{ 
+          type: 'return',
+          amount: Math.min(returnAmount, cartTotal),
+          returnId
+        }]);
+      }
+    }
+  }, [open, returnAmount, returnId, cartTotal]);
 
   const addPayment = (payment: PaymentMethod) => {
     setPayments(prev => [...prev, payment]);
@@ -60,6 +93,32 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
     }
   };
 
+  const handleCreditPayment = () => {
+    if (!selectedCustomer) {
+      toast.error('Debe seleccionar un cliente para ventas a crédito');
+      return;
+    }
+    
+    const creditLimit = selectedCustomer.creditLimit || 0;
+    const currentBalance = selectedCustomer.creditBalance || 0;
+    const availableCredit = creditLimit - currentBalance;
+    
+    if (availableCredit <= 0) {
+      toast.error('El cliente no tiene crédito disponible');
+      return;
+    }
+    
+    if (remaining > availableCredit) {
+      toast.error(`El monto excede el crédito disponible (RD$ ${availableCredit.toLocaleString()})`);
+      return;
+    }
+    
+    if (remaining > 0) {
+      addPayment({ type: 'credit', amount: remaining });
+      setUseCredit(true);
+    }
+  };
+
   const completeSaleTransaction = () => {
     if (remaining <= 0 && cart.length > 0 && currentUser) {
       const sale = {
@@ -71,7 +130,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
         payments: [...payments],
         customerId: selectedCustomer?.id,
         userId: currentUser.id,
-        receiptNumber: `REC-${Date.now()}`
+        receiptNumber: `REC-${Date.now()}`,
+        status: payments.some(p => p.type === 'credit') ? 'credit' : 'completed',
+        ...(payments.some(p => p.type === 'credit') && { dueDate: getNextMonth() })
       };
 
       completeSale(sale);
@@ -81,6 +142,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
       setCashAmount('');
       setCardAmount('');
       setCardReference('');
+      setUseCredit(false);
+      setReturnPayment(false);
       
       toast.success('Venta completada exitosamente');
       onClose();
@@ -92,7 +155,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
     setCashAmount('');
     setCardAmount('');
     setCardReference('');
+    setUseCredit(false);
+    setReturnPayment(false);
   };
+  
+  // Helper to get date for next month (for credit due date)
+  const getNextMonth = () => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + 1);
+    return date.toISOString();
+  };
+
+  // Determine if credit payment is available
+  const isCreditAvailable = selectedCustomer && 
+    (selectedCustomer.creditLimit || 0) > 0 &&
+    ((selectedCustomer.creditBalance || 0) < (selectedCustomer.creditLimit || 0));
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -108,7 +185,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
           {/* Payment Methods */}
           <div>
             <Tabs defaultValue="cash" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="cash" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
                   Efectivo
@@ -116,6 +193,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
                 <TabsTrigger value="card" className="flex items-center gap-2">
                   <CreditCard className="h-4 w-4" />
                   Tarjeta
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="credit" 
+                  className="flex items-center gap-2"
+                  disabled={!isCreditAvailable}
+                >
+                  <Calendar className="h-4 w-4" />
+                  Crédito
                 </TabsTrigger>
               </TabsList>
               
@@ -177,6 +262,55 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
                   Agregar Pago con Tarjeta
                 </Button>
               </TabsContent>
+              
+              <TabsContent value="credit" className="space-y-4">
+                {selectedCustomer ? (
+                  <>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <h3 className="font-medium mb-2">Información de Crédito</h3>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-gray-500">Límite de Crédito</p>
+                          <p className="font-medium">RD$ {(selectedCustomer.creditLimit || 0).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Balance Actual</p>
+                          <p className="font-medium">RD$ {(selectedCustomer.creditBalance || 0).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Disponible</p>
+                          <p className="font-medium text-green-600">
+                            RD$ {((selectedCustomer.creditLimit || 0) - (selectedCustomer.creditBalance || 0)).toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">A Pagar</p>
+                          <p className="font-medium text-red-600">RD$ {remaining.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-2">
+                      <Button 
+                        onClick={handleCreditPayment} 
+                        className="w-full"
+                        disabled={useCredit || remaining <= 0}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Usar Crédito
+                      </Button>
+                    </div>
+                    
+                    <div className="text-sm text-gray-600 bg-yellow-50 p-2 rounded">
+                      🕑 La fecha de vencimiento será en 30 días
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Debe seleccionar un cliente para usar crédito</p>
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           </div>
 
@@ -213,6 +347,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
                   <span>Total:</span>
                   <span>RD$ {cartTotal.toLocaleString()}</span>
                 </div>
+                
+                {returnAmount > 0 && (
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>Devolución:</span>
+                    <span>- RD$ {returnAmount.toLocaleString()}</span>
+                  </div>
+                )}
+                
+                {returnAmount > 0 && (
+                  <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                    <span>A Pagar:</span>
+                    <span>RD$ {totalAfterReturn.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -220,14 +368,25 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ open, onClose, selectedCust
               <div className="bg-green-50 p-4 rounded-lg">
                 <h3 className="font-medium mb-3">Pagos Registrados</h3>
                 <div className="space-y-2 text-sm">
-                  {payments.map((payment, index) => (
-                    <div key={index} className="flex justify-between">
-                      <span className="capitalize">
-                        {payment.type === 'cash' ? 'Efectivo' : 'Tarjeta'}:
-                      </span>
-                      <span>RD$ {payment.amount.toLocaleString()}</span>
-                    </div>
-                  ))}
+                  {payments.map((payment, index) => {
+                    let paymentMethod = "";
+                    switch(payment.type) {
+                      case 'cash': paymentMethod = "Efectivo"; break;
+                      case 'card': paymentMethod = "Tarjeta"; break;
+                      case 'credit': paymentMethod = "Crédito"; break;
+                      case 'return': paymentMethod = "Devolución"; break;
+                      default: paymentMethod = payment.type;
+                    }
+                    
+                    return (
+                      <div key={index} className="flex justify-between">
+                        <span className="capitalize">
+                          {paymentMethod}:
+                        </span>
+                        <span>RD$ {payment.amount.toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
                   <div className="border-t pt-2">
                     <div className="flex justify-between font-semibold">
                       <span>Total Pagado:</span>

@@ -13,6 +13,7 @@ export interface Product {
   taxRate: number;
   image?: string;
   supplier?: string;
+  wholesalePrice?: number;
 }
 
 export interface Customer {
@@ -24,6 +25,9 @@ export interface Customer {
   address?: string;
   totalPurchases?: number;
   lastPurchase?: string;
+  creditLimit?: number;
+  creditBalance?: number;
+  isWholesale?: boolean;
 }
 
 export interface CartItem {
@@ -33,12 +37,14 @@ export interface CartItem {
   quantity: number;
   taxRate: number;
   discount?: number;
+  isWholesalePrice?: boolean;
 }
 
 export interface PaymentMethod {
-  type: 'cash' | 'card' | 'transfer' | 'check';
+  type: 'cash' | 'card' | 'transfer' | 'check' | 'credit' | 'return';
   amount: number;
   reference?: string;
+  returnId?: string;
 }
 
 export interface Sale {
@@ -52,6 +58,19 @@ export interface Sale {
   customerId?: string;
   userId: string;
   receiptNumber: string;
+  status: 'completed' | 'returned' | 'partially-returned' | 'credit' | 'paid-credit';
+  returnedItems?: ReturnedItem[];
+  dueDate?: string;
+}
+
+export interface ReturnedItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  returnReason: string;
+  returnDate: string;
+  originalSaleId: string;
 }
 
 export interface User {
@@ -65,7 +84,7 @@ export interface User {
 export interface InventoryMovement {
   id: string;
   productId: string;
-  type: 'sale' | 'purchase' | 'adjustment';
+  type: 'sale' | 'purchase' | 'adjustment' | 'return';
   quantity: number;
   reason?: string;
   date: string;
