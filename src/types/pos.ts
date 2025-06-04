@@ -41,10 +41,11 @@ export interface CartItem {
 }
 
 export interface PaymentMethod {
-  type: 'cash' | 'card' | 'transfer' | 'check' | 'credit' | 'return';
+  type: 'cash' | 'card' | 'transfer' | 'check' | 'credit' | 'return' | 'credit-note';
   amount: number;
   reference?: string;
   returnId?: string;
+  creditNoteId?: string;
 }
 
 export interface Sale {
@@ -71,6 +72,18 @@ export interface ReturnedItem {
   returnReason: string;
   returnDate: string;
   originalSaleId: string;
+}
+
+export interface CreditNote {
+  id: string;
+  customerId?: string;
+  originalSaleId: string;
+  amount: number;
+  balance: number;
+  issueDate: string;
+  reason: string;
+  status: 'active' | 'used' | 'expired';
+  returnItems: ReturnedItem[];
 }
 
 export interface User {

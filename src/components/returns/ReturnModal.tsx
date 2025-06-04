@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Sale, ReturnedItem } from '@/types/pos';
+import { Switch } from '@/components/ui/switch';
+import { Sale, ReturnedItem, CreditNote } from '@/types/pos';
 import { usePos } from '@/contexts/PosContext';
 import { toast } from 'sonner';
-import { ArrowLeftCircle, Printer } from 'lucide-react';
+import { ArrowLeftCircle, Printer, CreditCard } from 'lucide-react';
 
 interface ReturnModalProps {
   open: boolean;
@@ -18,7 +19,7 @@ interface ReturnModalProps {
 }
 
 const ReturnModal: React.FC<ReturnModalProps> = ({ open, onClose, sale }) => {
-  const { processReturn } = usePos();
+  const { processReturn, createCreditNote } = usePos();
   const [returningItems, setReturningItems] = useState<Array<{
     productId: string;
     name: string;
@@ -28,6 +29,7 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ open, onClose, sale }) => {
     reason: string;
   }>>([]);
   const [returnTotal, setReturnTotal] = useState(0);
+  const [generateCreditNote, setGenerateCreditNote] = useState(true);
 
   useEffect(() => {
     if (sale) {
@@ -65,6 +67,19 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ open, onClose, sale }) => {
     setReturningItems(newItems);
   };
 
+  const printReturnInvoice = (returnId: string, returnItems: ReturnedItem[]) => {
+    console.log('Printing return invoice', {
+      returnId,
+      date: new Date().toISOString(),
+      originalSale: sale?.receiptNumber,
+      customer: sale?.customerId,
+      items: returnItems,
+      totalAmount: returnTotal,
+      invoiceType: 'DEVOLUCION'
+    });
+    toast.info('Imprimiendo factura de devolución');
+  };
+
   const handleSubmit = () => {
     if (!sale) return;
     
@@ -97,19 +112,44 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ open, onClose, sale }) => {
     
     if (returnId) {
       toast.success(`Devolución procesada con ID: ${returnId}`);
-      onClose();
-
-      // Simulate printing return receipt
+      
+      // Print return invoice
       setTimeout(() => {
-        console.log('Printing return receipt', {
-          returnId,
-          date: new Date().toISOString(),
-          originalSale: sale.receiptNumber,
-          items: returnItems,
-          totalAmount: returnTotal
-        });
-        toast.info('Imprimiendo comprobante de devolución');
-      }, 1000);
+        printReturnInvoice(returnId, returnItems);
+      }, 500);
+      
+      // Generate credit note if requested
+      if (generateCreditNote && returnTotal > 0) {
+        const creditNote: Omit<CreditNote, 'id'> = {
+          customerId: sale.customerId,
+          originalSaleId: sale.id,
+          amount: returnTotal,
+          balance: returnTotal,
+          issueDate: new Date().toISOString(),
+          reason: `Devolución de factura ${sale.receiptNumber}`,
+          status: 'active',
+          returnItems
+        };
+        
+        const creditNoteId = createCreditNote(creditNote);
+        if (creditNoteId) {
+          toast.success(`Nota de crédito generada: ${creditNoteId}`);
+          
+          // Print credit note
+          setTimeout(() => {
+            console.log('Printing credit note', {
+              creditNoteId,
+              amount: returnTotal,
+              date: new Date().toISOString(),
+              customer: sale.customerId,
+              reason: creditNote.reason
+            });
+            toast.info('Imprimiendo nota de crédito');
+          }, 1000);
+        }
+      }
+      
+      onClose();
     } else {
       toast.error('Error al procesar la devolución');
     }
@@ -184,10 +224,27 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ open, onClose, sale }) => {
           </div>
 
           <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-3">
               <h3 className="font-medium">Total a Devolver:</h3>
               <span className="text-xl font-bold">RD$ {returnTotal.toLocaleString()}</span>
             </div>
+            
+            <div className="flex items-center gap-2">
+              <Switch 
+                checked={generateCreditNote} 
+                onCheckedChange={setGenerateCreditNote}
+                id="generate-credit-note"
+              />
+              <Label htmlFor="generate-credit-note" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Generar Nota de Crédito
+              </Label>
+            </div>
+            {generateCreditNote && (
+              <p className="text-sm text-gray-600 mt-2">
+                Se generará una nota de crédito que el cliente podrá usar en futuras compras
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2">

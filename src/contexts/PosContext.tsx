@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod } from '@/types/pos';
+import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote } from '@/types/pos';
 import { User } from '@/types/auth';
 
 interface PosContextType {
@@ -36,6 +36,12 @@ interface PosContextType {
   processReturn: (saleId: string, items: ReturnedItem[]) => string;
   returnedItems: ReturnedItem[];
   
+  // Credit Notes
+  creditNotes: CreditNote[];
+  createCreditNote: (creditNote: Omit<CreditNote, 'id'>) => string;
+  getCustomerCreditNotes: (customerId: string) => CreditNote[];
+  useCreditNote: (creditNoteId: string, amount: number) => boolean;
+  
   // Credit
   getCustomerCreditBalance: (customerId: string) => number;
   getCreditSales: (customerId: string) => Sale[];
@@ -54,6 +60,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [returnedItems, setReturnedItems] = useState<ReturnedItem[]>([]);
+  const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
 
   // Initialize with sample data
   useEffect(() => {
@@ -256,6 +263,37 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return sales.find(s => s.id === id);
   };
 
+  // Credit Note functions
+  const createCreditNote = (creditNote: Omit<CreditNote, 'id'>) => {
+    const newCreditNoteId = `CN-${Date.now()}`;
+    const newCreditNote: CreditNote = {
+      ...creditNote,
+      id: newCreditNoteId
+    };
+    
+    setCreditNotes(prev => [...prev, newCreditNote]);
+    return newCreditNoteId;
+  };
+
+  const getCustomerCreditNotes = (customerId: string) => {
+    return creditNotes.filter(note => note.customerId === customerId);
+  };
+
+  const useCreditNote = (creditNoteId: string, amount: number) => {
+    setCreditNotes(prev => prev.map(note => {
+      if (note.id === creditNoteId) {
+        const newBalance = note.balance - amount;
+        return {
+          ...note,
+          balance: Math.max(0, newBalance),
+          status: newBalance <= 0 ? 'used' : 'active'
+        };
+      }
+      return note;
+    }));
+    return true;
+  };
+
   // Credit functions
   const getCustomerCreditBalance = (customerId: string) => {
     const customer = getCustomer(customerId);
@@ -372,6 +410,14 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     
+    // Process credit note payments
+    const creditNotePayments = sale.payments.filter(p => p.type === 'credit-note');
+    creditNotePayments.forEach(payment => {
+      if (payment.creditNoteId) {
+        useCreditNote(payment.creditNoteId, payment.amount);
+      }
+    });
+    
     // Register cash entry if cash payment
     const cashPayments = sale.payments.filter(p => p.type === 'cash');
     if (cashPayments.length > 0 && currentUser) {
@@ -418,6 +464,10 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       getSale,
       processReturn,
       returnedItems,
+      creditNotes,
+      createCreditNote,
+      getCustomerCreditNotes,
+      useCreditNote,
       getCustomerCreditBalance,
       getCreditSales,
       updateCreditSale,

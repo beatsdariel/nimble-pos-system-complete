@@ -9,6 +9,7 @@ import { PaymentMethod, Customer, Sale } from '@/types/pos';
 import { CreditCard, DollarSign, Banknote, Receipt, Zap, Calendar, ArrowLeftCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import CreditNoteModal from '@/components/returns/CreditNoteModal';
 
 interface PaymentModalProps {
   open: boolean;
@@ -32,6 +33,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [cardReference, setCardReference] = useState<string>('');
   const [useCredit, setUseCredit] = useState<boolean>(false);
   const [returnPayment, setReturnPayment] = useState<boolean>(returnAmount > 0);
+  const [showCreditNotes, setShowCreditNotes] = useState<boolean>(false);
 
   // Calculate totals considering return amount
   const totalAfterReturn = Math.max(0, cartTotal - returnAmount);
@@ -118,6 +120,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
+  const handleCreditNotePayment = (creditNote: any, amountToUse: number) => {
+    if (amountToUse > 0) {
+      addPayment({ 
+        type: 'credit-note', 
+        amount: amountToUse,
+        creditNoteId: creditNote.id 
+      });
+    }
+  };
+
   const completeSaleTransaction = () => {
     if (remaining <= 0 && cart.length > 0 && currentUser) {
       const saleStatus: Sale['status'] = payments.some(p => p.type === 'credit') ? 'credit' : 'completed';
@@ -186,7 +198,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           {/* Payment Methods */}
           <div>
             <Tabs defaultValue="cash" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="cash" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
                   Efectivo
@@ -202,6 +214,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 >
                   <Calendar className="h-4 w-4" />
                   Crédito
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="credit-note" 
+                  className="flex items-center gap-2"
+                  disabled={!selectedCustomer}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Nota
                 </TabsTrigger>
               </TabsList>
               
@@ -312,6 +332,35 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   </div>
                 )}
               </TabsContent>
+              
+              <TabsContent value="credit-note" className="space-y-4">
+                {selectedCustomer ? (
+                  <>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h3 className="font-medium mb-2">Notas de Crédito</h3>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Use las notas de crédito disponibles del cliente para este pago
+                      </p>
+                      <Button 
+                        onClick={() => setShowCreditNotes(true)}
+                        className="w-full"
+                        variant="outline"
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Ver Notas de Crédito Disponibles
+                      </Button>
+                    </div>
+                    
+                    <div className="text-sm text-gray-600 bg-blue-50 p-2 rounded">
+                      💡 Las notas de crédito se aplicarán automáticamente al monto pendiente
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Debe seleccionar un cliente para usar notas de crédito</p>
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           </div>
 
@@ -376,6 +425,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                       case 'card': paymentMethod = "Tarjeta"; break;
                       case 'credit': paymentMethod = "Crédito"; break;
                       case 'return': paymentMethod = "Devolución"; break;
+                      case 'credit-note': paymentMethod = "Nota de Crédito"; break;
                       default: paymentMethod = payment.type;
                     }
                     
@@ -383,6 +433,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                       <div key={index} className="flex justify-between">
                         <span className="capitalize">
                           {paymentMethod}:
+                          {payment.creditNoteId && ` (${payment.creditNoteId})`}
                         </span>
                         <span>RD$ {payment.amount.toLocaleString()}</span>
                       </div>
@@ -429,6 +480,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
         </div>
       </DialogContent>
+      
+      <CreditNoteModal
+        open={showCreditNotes}
+        onClose={() => setShowCreditNotes(false)}
+        customerId={selectedCustomer?.id}
+        onSelectCreditNote={(creditNote) => {
+          const amountToUse = Math.min(creditNote.balance, remaining);
+          handleCreditNotePayment(creditNote, amountToUse);
+        }}
+      />
     </Dialog>
   );
 };
