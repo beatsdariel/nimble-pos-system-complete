@@ -13,14 +13,16 @@ import { ShoppingCart as CartIcon, CreditCard, User } from 'lucide-react';
 const Sales = () => {
   const { cart, cartTotal, customers } = usePos();
   const [showPayment, setShowPayment] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('no-customer');
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
     setShowPayment(true);
   };
 
-  const selectedCustomerData = selectedCustomer ? customers.find(c => c.id === selectedCustomer) : null;
+  const selectedCustomerData = selectedCustomer && selectedCustomer !== 'no-customer' 
+    ? customers.find(c => c.id === selectedCustomer) 
+    : null;
 
   return (
     <Layout>
@@ -57,7 +59,7 @@ const Sales = () => {
                     <SelectValue placeholder="Seleccionar cliente..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin cliente</SelectItem>
+                    <SelectItem value="no-customer">Sin cliente</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         <div className="flex flex-col">
