@@ -217,12 +217,31 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       
       if (existingItem) {
+        // Check stock availability
+        const newQuantity = existingItem.quantity + quantity;
+        if (newQuantity > product.stock) {
+          console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
+          return prev.map(item =>
+            item.productId === product.id && item.isWholesalePrice === isWholesale
+              ? { ...item, quantity: product.stock }
+              : item
+          );
+        }
+        
         return prev.map(item =>
           item.productId === product.id && item.isWholesalePrice === isWholesale
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: newQuantity }
             : item
         );
       }
+      
+      // Check stock for new item
+      if (quantity > product.stock) {
+        console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
+        quantity = product.stock;
+      }
+      
+      if (quantity <= 0) return prev;
       
       return [...prev, {
         productId: product.id,
@@ -240,6 +259,14 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       removeFromCart(productId);
       return;
     }
+
+    // Check stock availability
+    const product = getProduct(productId);
+    if (product && quantity > product.stock) {
+      console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
+      quantity = product.stock;
+    }
+
     setCart(prev => prev.map(item =>
       item.productId === productId ? { ...item, quantity } : item
     ));
@@ -391,7 +418,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const completeSale = (sale: Omit<Sale, 'id'>) => {
     if (!currentUser) return;
 
-    const newSaleId = Date.now().toString();
+    const newSaleId = `SALE-${Date.now()}`;
     const newSale: Sale = { 
       ...sale, 
       id: newSaleId,
@@ -432,12 +459,18 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     // Update product stock
     sale.items.forEach(item => {
-      updateProduct(item.productId, {
-        stock: (getProduct(item.productId)?.stock || 0) - item.quantity
-      });
+      const product = getProduct(item.productId);
+      if (product) {
+        updateProduct(item.productId, {
+          stock: Math.max(0, product.stock - item.quantity)
+        });
+      }
     });
     
     clearCart();
+    
+    // Return the completed sale for printing
+    return newSale;
   };
 
   return (

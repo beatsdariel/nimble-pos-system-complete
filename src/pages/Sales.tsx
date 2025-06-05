@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePos } from '@/contexts/PosContext';
-import { ShoppingCart as CartIcon, CreditCard, User, History, Tag } from 'lucide-react';
+import { ShoppingCart as CartIcon, CreditCard, User, History, Tag, Search, Badge } from 'lucide-react';
 
 const Sales = () => {
   const { cart, cartTotal, customers, addToCart, products } = usePos();
@@ -41,7 +41,7 @@ const Sales = () => {
     }
   };
 
-  // Handle product quantity addition with wholesale price
+  // Enhanced product addition with wholesale pricing
   const handleAddProduct = (productId: string, quantity: number) => {
     const product = products.find(p => p.id === productId);
     if (product) {
@@ -61,7 +61,7 @@ const Sales = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Punto de Venta</h1>
-            <p className="text-gray-600">Procesa transacciones de venta</p>
+            <p className="text-gray-600">Sistema completo e interactivo de ventas</p>
           </div>
           <Button 
             variant="outline"
@@ -74,10 +74,24 @@ const Sales = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Product Search */}
+          {/* Enhanced Product Search */}
           <div className="lg:col-span-2">
             <Card className="p-6">
-              <ProductSearch />
+              <div className="flex items-center gap-2 mb-4">
+                <Search className="h-5 w-5" />
+                <h2 className="text-lg font-semibold">Búsqueda de Productos</h2>
+                {useWholesalePrices && (
+                  <Badge variant="secondary" className="ml-auto">
+                    <Tag className="h-3 w-3 mr-1" />
+                    Precios Mayoristas
+                  </Badge>
+                )}
+              </div>
+              
+              <ProductSearch 
+                onAddToCart={handleAddProduct}
+                useWholesalePrices={useWholesalePrices}
+              />
               
               {/* Wholesale Pricing Toggle */}
               <div className="flex items-center justify-end mt-4 gap-2 border-t pt-4">
@@ -87,12 +101,6 @@ const Sales = () => {
                   onCheckedChange={setUseWholesalePrices}
                   disabled={selectedCustomer !== 'no-customer' && !selectedCustomerData?.isWholesale}
                 />
-                {useWholesalePrices && (
-                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                    <Tag className="h-3 w-3 mr-1" />
-                    Mayorista
-                  </span>
-                )}
               </div>
             </Card>
           </div>
@@ -103,6 +111,11 @@ const Sales = () => {
               <div className="flex items-center gap-2 mb-4">
                 <CartIcon className="h-5 w-5" />
                 <h2 className="text-lg font-semibold">Carrito de Compras</h2>
+                {cart.length > 0 && (
+                  <Badge variant="outline" className="ml-auto">
+                    {cart.reduce((sum, item) => sum + item.quantity, 0)} items
+                  </Badge>
+                )}
               </div>
 
               {/* Customer Selection */}
