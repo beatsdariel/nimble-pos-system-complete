@@ -15,7 +15,9 @@ const Sales = () => {
   const [returnData, setReturnData] = useState<{ returnAmount: number, returnId: string } | null>(null);
 
   const handleCheckout = () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0) {
+      return;
+    }
     setShowPayment(true);
   };
 
@@ -32,6 +34,8 @@ const Sales = () => {
       const customer = customers.find(c => c.id === customerId);
       if (customer?.isWholesale) {
         setUseWholesalePrices(true);
+      } else {
+        setUseWholesalePrices(false);
       }
     }
   };
