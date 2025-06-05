@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { usePos } from '@/contexts/PosContext';
 import { Purchase, PurchaseItem } from '@/types/inventory';
 import { toast } from 'sonner';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Receipt } from 'lucide-react';
 
 interface PurchaseModalProps {
   open: boolean;
@@ -25,7 +26,12 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
     date: new Date().toISOString().split('T')[0],
     dueDate: '',
     status: 'pending' as 'pending' | 'received' | 'partial' | 'cancelled',
-    notes: ''
+    notes: '',
+    // New fiscal fields
+    fiscalReceipt: false,
+    fiscalNumber: '',
+    paymentType: 'cash' as 'cash' | 'credit',
+    invoiceNumber: ''
   });
   const [items, setItems] = useState<PurchaseItem[]>([]);
 
@@ -37,7 +43,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
         date: purchase.date.split('T')[0],
         dueDate: purchase.dueDate?.split('T')[0] || '',
         status: purchase.status,
-        notes: purchase.notes || ''
+        notes: purchase.notes || '',
+        fiscalReceipt: (purchase as any).fiscalReceipt || false,
+        fiscalNumber: (purchase as any).fiscalNumber || '',
+        paymentType: (purchase as any).paymentType || 'cash',
+        invoiceNumber: (purchase as any).invoiceNumber || ''
       });
       setItems(purchase.items);
     } else {
@@ -47,7 +57,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
         date: new Date().toISOString().split('T')[0],
         dueDate: '',
         status: 'pending',
-        notes: ''
+        notes: '',
+        fiscalReceipt: false,
+        fiscalNumber: '',
+        paymentType: 'cash',
+        invoiceNumber: ''
       });
       setItems([]);
     }
@@ -104,6 +118,12 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
       return;
     }
 
+    // Validate fiscal receipt fields
+    if (formData.fiscalReceipt && !formData.fiscalNumber) {
+      toast.error('Debe ingresar el número de comprobante fiscal');
+      return;
+    }
+
     const purchaseData = {
       supplierId: formData.supplierId,
       supplierName: supplier.name,
@@ -115,15 +135,20 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
       subtotal,
       tax,
       total,
-      paidAmount: 0,
-      notes: formData.notes || undefined
+      paidAmount: formData.paymentType === 'cash' ? total : 0,
+      notes: formData.notes || undefined,
+      // Add fiscal fields to purchase data
+      fiscalReceipt: formData.fiscalReceipt,
+      fiscalNumber: formData.fiscalNumber || undefined,
+      paymentType: formData.paymentType,
+      invoiceNumber: formData.invoiceNumber || undefined
     };
 
     if (purchase) {
-      updatePurchase(purchase.id, purchaseData);
+      updatePurchase(purchase.id, purchaseData as any);
       toast.success('Compra actualizada exitosamente');
     } else {
-      addPurchase(purchaseData);
+      addPurchase(purchaseData as any);
       toast.success('Compra registrada exitosamente');
     }
 
@@ -132,9 +157,10 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
             {purchase ? 'Editar Compra' : 'Nueva Compra'}
           </DialogTitle>
         </DialogHeader>
@@ -202,6 +228,61 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
               </Select>
             </div>
           </div>
+
+          {/* Fiscal Receipt Section */}
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Información Fiscal</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="fiscalReceipt">Comprobante Fiscal</Label>
+                  <Switch
+                    id="fiscalReceipt"
+                    checked={formData.fiscalReceipt}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, fiscalReceipt: checked }))}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="paymentType">Tipo de Pago</Label>
+                  <Select value={formData.paymentType} onValueChange={(value: 'cash' | 'credit') => setFormData(prev => ({ ...prev, paymentType: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Contado</SelectItem>
+                      <SelectItem value="credit">Crédito</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {formData.fiscalReceipt && (
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <Label htmlFor="fiscalNumber">Número de Comprobante Fiscal *</Label>
+                    <Input
+                      id="fiscalNumber"
+                      value={formData.fiscalNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fiscalNumber: e.target.value }))}
+                      placeholder="B0100000001"
+                      required={formData.fiscalReceipt}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="invoiceNumber">Número de Factura</Label>
+                    <Input
+                      id="invoiceNumber"
+                      value={formData.invoiceNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, invoiceNumber: e.target.value }))}
+                      placeholder="FAC-001"
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardContent className="p-4">
@@ -277,11 +358,24 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
                     <p>Subtotal: RD$ {subtotal.toFixed(2)}</p>
                     <p>ITBIS (18%): RD$ {tax.toFixed(2)}</p>
                     <p className="font-bold text-lg">Total: RD$ {total.toFixed(2)}</p>
+                    {formData.paymentType === 'credit' && (
+                      <p className="text-orange-600 font-medium">Pendiente de Pago</p>
+                    )}
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          <div>
+            <Label htmlFor="notes">Notas</Label>
+            <Input
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="Notas adicionales sobre la compra"
+            />
+          </div>
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>

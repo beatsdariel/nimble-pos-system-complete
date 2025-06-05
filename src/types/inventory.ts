@@ -1,4 +1,3 @@
-
 export interface Supplier {
   id: string;
   name: string;
@@ -28,6 +27,10 @@ export interface Purchase {
   paidAmount: number;
   userId: string;
   notes?: string;
+  fiscalReceipt?: boolean;
+  fiscalNumber?: string;
+  paymentType?: 'cash' | 'credit';
+  invoiceNumber?: string;
 }
 
 export interface PurchaseItem {
