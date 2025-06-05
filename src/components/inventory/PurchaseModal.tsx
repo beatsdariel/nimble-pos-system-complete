@@ -24,7 +24,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
     purchaseNumber: '',
     date: new Date().toISOString().split('T')[0],
     dueDate: '',
-    status: 'pending' as const,
+    status: 'pending' as 'pending' | 'received' | 'partial' | 'cancelled',
     notes: ''
   });
   const [items, setItems] = useState<PurchaseItem[]>([]);
@@ -189,7 +189,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
             </div>
             <div>
               <Label htmlFor="status">Estado</Label>
-              <Select value={formData.status} onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}>
+              <Select value={formData.status} onValueChange={(value: 'pending' | 'received' | 'partial' | 'cancelled') => setFormData(prev => ({ ...prev, status: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

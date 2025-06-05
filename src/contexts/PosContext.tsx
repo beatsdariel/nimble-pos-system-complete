@@ -1,6 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote, Supplier, Purchase, InventoryCount } from '@/types/pos';
+import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote } from '@/types/pos';
+import { Supplier, Purchase, InventoryCount } from '@/types/inventory';
 import { User } from '@/types/auth';
 
 interface PosContextType {
