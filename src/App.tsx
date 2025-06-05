@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,30 +26,26 @@ const AppContent = () => {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/sales" element={<Sales />} />
-        
-        {/* Rutas solo para administradores */}
-        {currentUser?.role === 'admin' && (
-          <>
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/settings" element={<Settings />} />
-          </>
-        )}
-        
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/sales" element={<Sales />} />
+      
+      {/* Rutas solo para administradores */}
+      {currentUser?.role === 'admin' && (
+        <>
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
+        </>
+      )}
+      
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 };
 
 function App() {
-  const queryClient = new QueryClient();
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -58,6 +55,8 @@ function App() {
               <BrowserRouter>
                 <div className="min-h-screen bg-gray-50 w-full">
                   <AppContent />
+                  <Toaster />
+                  <Sonner />
                 </div>
               </BrowserRouter>
             </SettingsProvider>
