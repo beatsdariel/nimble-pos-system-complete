@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const addPayment = (payment: PaymentMethod) => {
     setPayments(prev => [...prev, payment]);
+  };
+
+  const resetPayments = () => {
+    setPayments([]);
+    setCashAmount('');
+    setCardAmount('');
+    setCardReference('');
+    setUseCredit(false);
+    setReturnPayment(false);
   };
 
   const handleExactCashPayment = () => {
@@ -139,7 +149,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     const finalTotal = cartTotal - returnAmount;
     const finalPayments = payments.map(payment => ({
       ...payment,
-      amount: payment.type === 'return' ? payment.amount : payment.amount + returnAmount
+      amount: payment.type === 'return' ? payment.amount : payment.amount
     }));
 
     const isCreditSale = finalPayments.some(p => p.type === 'credit');

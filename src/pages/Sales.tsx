@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import ProductSearch from '@/components/sales/ProductSearch';
@@ -8,8 +9,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { usePos } from '@/contexts/PosContext';
-import { ShoppingCart as CartIcon, CreditCard, User, History, Tag, Search, Badge } from 'lucide-react';
+import { ShoppingCart as CartIcon, CreditCard, User, History, Tag, Search } from 'lucide-react';
 
 const Sales = () => {
   const { cart, cartTotal, customers, addToCart, products } = usePos();
