@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote } from '@/types/pos';
+import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote, Supplier, Purchase, InventoryCount } from '@/types/pos';
 import { User } from '@/types/auth';
 
 interface PosContextType {
@@ -47,6 +47,23 @@ interface PosContextType {
   getCreditSales: (customerId: string) => Sale[];
   updateCreditSale: (saleId: string, paymentAmount: number, paymentMethod: PaymentMethod) => void;
   
+  // Suppliers
+  suppliers: Supplier[];
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => void;
+  updateSupplier: (id: string, updates: Partial<Supplier>) => void;
+  getSupplier: (id: string) => Supplier | undefined;
+  
+  // Purchases
+  purchases: Purchase[];
+  addPurchase: (purchase: Omit<Purchase, 'id' | 'userId'>) => void;
+  updatePurchase: (id: string, updates: Partial<Purchase>) => void;
+  getPurchase: (id: string) => Purchase | undefined;
+  
+  // Inventory Counts
+  inventoryCounts: InventoryCount[];
+  addInventoryCount: (count: Omit<InventoryCount, 'id' | 'userId'>) => void;
+  updateInventoryCount: (id: string, updates: Partial<InventoryCount>) => void;
+  
   // User
   currentUser: User | null;
 }
@@ -61,6 +78,9 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sales, setSales] = useState<Sale[]>([]);
   const [returnedItems, setReturnedItems] = useState<ReturnedItem[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [inventoryCounts, setInventoryCounts] = useState<InventoryCount[]>([]);
 
   // Initialize with sample data
   useEffect(() => {
@@ -370,6 +390,93 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Supplier functions
+  const addSupplier = (supplier: Omit<Supplier, 'id' | 'createdAt'>) => {
+    const newSupplier: Supplier = {
+      ...supplier,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString()
+    };
+    setSuppliers(prev => [...prev, newSupplier]);
+  };
+
+  const updateSupplier = (id: string, updates: Partial<Supplier>) => {
+    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  };
+
+  const getSupplier = (id: string) => {
+    return suppliers.find(s => s.id === id);
+  };
+
+  // Purchase functions
+  const addPurchase = (purchase: Omit<Purchase, 'id' | 'userId'>) => {
+    if (!currentUser) return;
+    
+    const newPurchase: Purchase = {
+      ...purchase,
+      id: Date.now().toString(),
+      userId: currentUser.id
+    };
+    setPurchases(prev => [...prev, newPurchase]);
+    
+    // Update product costs and stock if purchase is received
+    if (purchase.status === 'received') {
+      purchase.items.forEach(item => {
+        const product = getProduct(item.productId);
+        if (product) {
+          updateProduct(item.productId, {
+            cost: item.unitCost,
+            stock: product.stock + item.quantity
+          });
+        }
+      });
+    }
+  };
+
+  const updatePurchase = (id: string, updates: Partial<Purchase>) => {
+    setPurchases(prev => prev.map(p => {
+      if (p.id === id) {
+        const updatedPurchase = { ...p, ...updates };
+        
+        // Update product costs and stock if status changed to received
+        if (updates.status === 'received' && p.status !== 'received') {
+          updatedPurchase.items.forEach(item => {
+            const product = getProduct(item.productId);
+            if (product) {
+              updateProduct(item.productId, {
+                cost: item.unitCost,
+                stock: product.stock + item.quantity
+              });
+            }
+          });
+        }
+        
+        return updatedPurchase;
+      }
+      return p;
+    }));
+  };
+
+  const getPurchase = (id: string) => {
+    return purchases.find(p => p.id === id);
+  };
+
+  // Inventory Count functions
+  const addInventoryCount = (count: Omit<InventoryCount, 'id' | 'userId'>) => {
+    if (!currentUser) return;
+    
+    const newCount: InventoryCount = {
+      ...count,
+      id: Date.now().toString(),
+      userId: currentUser.id
+    };
+    setInventoryCounts(prev => [...prev, newCount]);
+  };
+
+  const updateInventoryCount = (id: string, updates: Partial<InventoryCount>) => {
+    setInventoryCounts(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
   // Return functions
   const processReturn = (saleId: string, items: ReturnedItem[]) => {
     if (!currentUser) return "";
@@ -504,6 +611,17 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       getCustomerCreditBalance,
       getCreditSales,
       updateCreditSale,
+      suppliers,
+      addSupplier,
+      updateSupplier,
+      getSupplier,
+      purchases,
+      addPurchase,
+      updatePurchase,
+      getPurchase,
+      inventoryCounts,
+      addInventoryCount,
+      updateInventoryCount,
       currentUser
     }}>
       {children}
