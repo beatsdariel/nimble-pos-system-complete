@@ -29,7 +29,7 @@ interface PosContextType {
   
   // Sales
   sales: Sale[];
-  completeSale: (sale: Omit<Sale, 'id'>) => void;
+  completeSale: (sale: Omit<Sale, 'id'>) => Sale | null;
   getSale: (id: string) => Sale | undefined;
   
   // Returns
@@ -416,7 +416,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sales functions
   const completeSale = (sale: Omit<Sale, 'id'>) => {
-    if (!currentUser) return;
+    if (!currentUser) return null;
 
     const newSaleId = `SALE-${Date.now()}`;
     const newSale: Sale = { 
