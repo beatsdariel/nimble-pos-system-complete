@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { SettingsProvider } from '@/contexts/SettingsContext';
 import { PosProvider } from "./contexts/PosContext";
 import LoginForm from "./components/auth/LoginForm";
 import Dashboard from "./pages/Dashboard";
@@ -14,7 +15,6 @@ import Customers from "./pages/Customers";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import { SettingsProvider } from '@/contexts/SettingsContext';
 
 const queryClient = new QueryClient();
 
@@ -50,8 +50,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <PosProvider>
-            <SettingsProvider>
+          <SettingsProvider>
+            <PosProvider>
               <BrowserRouter>
                 <div className="min-h-screen bg-gray-50 w-full">
                   <AppContent />
@@ -59,8 +59,8 @@ function App() {
                   <Sonner />
                 </div>
               </BrowserRouter>
-            </SettingsProvider>
-          </PosProvider>
+            </PosProvider>
+          </SettingsProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

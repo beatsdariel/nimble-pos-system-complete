@@ -3,25 +3,17 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Search, ShoppingCart, Clock, Trash2, Play } from 'lucide-react';
-import { toast } from 'sonner';
+import { Card, CardContent } from '@/components/ui/card';
+import { Search, Clock, User, DollarSign, Trash2, Play } from 'lucide-react';
+import { CartItem } from '@/types/pos';
 
 interface HoldOrder {
   id: string;
   customerName: string;
-  customerId?: string;
-  items: Array<{
-    productId: string;
-    name: string;
-    price: number;
-    quantity: number;
-  }>;
+  items: CartItem[];
   total: number;
-  holdDate: string;
-  holdTime: string;
-  userId: string;
+  createdAt: string;
 }
 
 interface HoldOrderManagerProps {
@@ -36,31 +28,25 @@ const HoldOrderManager: React.FC<HoldOrderManagerProps> = ({
   onResumeOrder
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [holdOrders, setHoldOrders] = useState<HoldOrder[]>([
+  const [holdOrders] = useState<HoldOrder[]>([
     {
       id: 'HOLD-001',
-      customerName: 'CONSUMIDOR FINAL',
+      customerName: 'Juan Pérez',
       items: [
-        { productId: '1', name: 'Café Premium', price: 350, quantity: 2 },
-        { productId: '2', name: 'Agua Mineral 500ml', price: 25, quantity: 3 }
+        { productId: '1', name: 'Café Premium', price: 350, quantity: 2, taxRate: 0.18, isWholesalePrice: false },
+        { productId: '2', name: 'Agua Mineral', price: 25, quantity: 3, taxRate: 0.18, isWholesalePrice: false }
       ],
       total: 775,
-      holdDate: new Date().toLocaleDateString(),
-      holdTime: '10:30 AM',
-      userId: 'user1'
+      createdAt: new Date().toISOString()
     },
     {
       id: 'HOLD-002',
-      customerName: 'Juan Pérez',
-      customerId: '1',
+      customerName: 'María García',
       items: [
-        { productId: '3', name: 'Pan Tostado', price: 70, quantity: 1 },
-        { productId: '4', name: 'Refresco Cola 355ml', price: 38, quantity: 2 }
+        { productId: '3', name: 'Pan Tostado', price: 85, quantity: 1, taxRate: 0.18, isWholesalePrice: false }
       ],
-      total: 146,
-      holdDate: new Date().toLocaleDateString(),
-      holdTime: '11:15 AM',
-      userId: 'user1'
+      total: 100.3,
+      createdAt: new Date().toISOString()
     }
   ]);
 
@@ -71,28 +57,21 @@ const HoldOrderManager: React.FC<HoldOrderManagerProps> = ({
 
   const handleResumeOrder = (order: HoldOrder) => {
     onResumeOrder(order);
-    setHoldOrders(prev => prev.filter(o => o.id !== order.id));
-    toast.success(`Pedido ${order.id} reanudado`);
     onClose();
-  };
-
-  const handleDeleteOrder = (orderId: string) => {
-    setHoldOrders(prev => prev.filter(o => o.id !== orderId));
-    toast.success('Pedido eliminado');
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Gestionar Pedidos Abiertos
+            Pedidos Abiertos
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Search */}
+          {/* Search Bar */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
@@ -103,108 +82,82 @@ const HoldOrderManager: React.FC<HoldOrderManagerProps> = ({
             />
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">{holdOrders.length}</div>
-                <div className="text-sm text-gray-600">Pedidos Abiertos</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  RD$ {holdOrders.reduce((sum, order) => sum + order.total, 0).toLocaleString()}
-                </div>
-                <div className="text-sm text-gray-600">Valor Total</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {holdOrders.reduce((sum, order) => sum + order.items.length, 0)}
-                </div>
-                <div className="text-sm text-gray-600">Items Totales</div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Orders List */}
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {filteredOrders.map((order) => (
-              <Card key={order.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold">{order.id}</h3>
-                        <Badge variant="secondary">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {order.holdTime}
-                        </Badge>
+          <div className="max-h-96 overflow-y-auto space-y-3">
+            {filteredOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No hay pedidos abiertos</p>
+              </div>
+            ) : (
+              filteredOrders.map((order) => (
+                <Card key={order.id} className="border-l-4 border-l-blue-500">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline">{order.id}</Badge>
+                          <span className="text-sm text-gray-500">
+                            {new Date(order.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-500" />
+                          <span className="font-medium">{order.customerName}</span>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600">Cliente: {order.customerName}</p>
-                      <p className="text-sm text-gray-500">Fecha: {order.holdDate}</p>
+                      <div className="text-right">
+                        <div className="flex items-center gap-1 text-lg font-bold">
+                          <DollarSign className="h-4 w-4" />
+                          RD$ {order.total.toLocaleString()}
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {order.items.length} artículo(s)
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-green-600">
-                        RD$ {order.total.toLocaleString()}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {order.items.length} item(s)
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Items Summary */}
-                  <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                    <h4 className="text-sm font-medium mb-2">Artículos:</h4>
-                    <div className="space-y-1">
+                    {/* Items Preview */}
+                    <div className="space-y-1 mb-3">
                       {order.items.slice(0, 3).map((item, index) => (
-                        <div key={index} className="flex justify-between text-xs">
+                        <div key={index} className="flex justify-between text-sm">
                           <span>{item.quantity}x {item.name}</span>
                           <span>RD$ {(item.price * item.quantity).toLocaleString()}</span>
                         </div>
                       ))}
                       {order.items.length > 3 && (
-                        <div className="text-xs text-gray-500">
-                          ... y {order.items.length - 3} artículo(s) más
-                        </div>
+                        <p className="text-xs text-gray-500">
+                          +{order.items.length - 3} artículo(s) más...
+                        </p>
                       )}
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleResumeOrder(order)}
-                      className="flex-1"
-                    >
-                      <Play className="h-4 w-4 mr-1" />
-                      Reanudar Pedido
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteOrder(order.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleResumeOrder(order)}
+                        className="flex-1"
+                      >
+                        <Play className="h-3 w-3 mr-2" />
+                        Resumir Pedido
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // Handle delete order
+                          console.log('Delete order:', order.id);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
-
-          {filteredOrders.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>
-                {searchTerm ? 'No se encontraron pedidos' : 'No hay pedidos abiertos'}
-              </p>
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>

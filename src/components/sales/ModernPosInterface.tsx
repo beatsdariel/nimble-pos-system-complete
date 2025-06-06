@@ -9,7 +9,7 @@ import { usePos } from '@/contexts/PosContext';
 import CentralProductSearch from './CentralProductSearch';
 import CustomerSelector from './CustomerSelector';
 import HoldOrderManager from './HoldOrderManager';
-import { ShoppingCart, Trash2, User, Calculator, CreditCard, Receipt, Archive, Clock, Users } from 'lucide-react';
+import { ShoppingCart, Trash2, User, Calculator, CreditCard, Receipt, Archive, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ModernPosInterfaceProps {
@@ -38,7 +38,9 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     removeFromCart, 
     clearCart,
     customers,
-    getCustomer
+    getCustomer,
+    addToCart,
+    getProduct
   } = usePos();
 
   const [showHoldOrders, setShowHoldOrders] = useState(false);
@@ -59,6 +61,17 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
   const handleClearCart = () => {
     clearCart();
     toast.success('Carrito limpiado');
+  };
+
+  const handleResumeOrder = (order: any) => {
+    clearCart();
+    order.items.forEach((item: any) => {
+      const product = getProduct(item.productId);
+      if (product) {
+        addToCart(product, item.quantity, item.isWholesalePrice);
+      }
+    });
+    toast.success(`Pedido ${order.id} reanudado`);
   };
 
   return (
@@ -306,6 +319,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
       <HoldOrderManager
         open={showHoldOrders}
         onClose={() => setShowHoldOrders(false)}
+        onResumeOrder={handleResumeOrder}
       />
     </div>
   );
