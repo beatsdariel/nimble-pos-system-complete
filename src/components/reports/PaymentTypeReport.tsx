@@ -10,14 +10,24 @@ const PaymentTypeReport = () => {
   const { sales } = usePos();
 
   const paymentData = sales.reduce((acc, sale) => {
-    const method = sale.paymentMethod || 'Efectivo';
-    if (!acc[method]) {
-      acc[method] = { method, transactions: 0, totalAmount: 0 };
+    // Get the primary payment method (first one or default to cash)
+    const primaryPayment = sale.payments[0];
+    const method = primaryPayment ? primaryPayment.type : 'cash';
+    const methodLabel = method === 'cash' ? 'Efectivo' : 
+                       method === 'card' ? 'Tarjeta' :
+                       method === 'transfer' ? 'Transferencia' :
+                       method === 'credit' ? 'Crédito' : 
+                       method.charAt(0).toUpperCase() + method.slice(1);
+    
+    if (!acc[methodLabel]) {
+      acc[methodLabel] = { method: methodLabel, transactions: 0, totalAmount: 0 };
     }
-    acc[method].transactions += 1;
-    acc[method].totalAmount += sale.total;
+    acc[methodLabel].transactions += 1;
+    acc[methodLabel].totalAmount += sale.total;
     return acc;
   }, {} as Record<string, any>);
+
+  const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
 
   return (
     <div className="space-y-6">
@@ -57,7 +67,7 @@ const PaymentTypeReport = () => {
                   <TableCell>{payment.transactions}</TableCell>
                   <TableCell>RD$ {payment.totalAmount.toLocaleString()}</TableCell>
                   <TableCell>
-                    {((payment.totalAmount / sales.reduce((sum, sale) => sum + sale.total, 0)) * 100).toFixed(1)}%
+                    {totalSales > 0 ? ((payment.totalAmount / totalSales) * 100).toFixed(1) : '0.0'}%
                   </TableCell>
                 </TableRow>
               ))}

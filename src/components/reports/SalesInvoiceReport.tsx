@@ -8,7 +8,7 @@ import { usePos } from '@/contexts/PosContext';
 import { Calendar, Printer, FileDown } from 'lucide-react';
 
 const SalesInvoiceReport = () => {
-  const { sales } = usePos();
+  const { sales, getCustomer } = usePos();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [filteredSales, setFilteredSales] = useState(sales);
@@ -129,21 +129,28 @@ const SalesInvoiceReport = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSales.map((sale) => (
-                <TableRow key={sale.id}>
-                  <TableCell className="font-medium">{sale.id}</TableCell>
-                  <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
-                  <TableCell>{sale.customerName || 'Cliente General'}</TableCell>
-                  <TableCell>RD$ {(sale.total - sale.tax).toLocaleString()}</TableCell>
-                  <TableCell>RD$ {sale.tax.toLocaleString()}</TableCell>
-                  <TableCell>RD$ {sale.total.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                      Completada
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filteredSales.map((sale) => {
+                const customer = sale.customerId ? getCustomer(sale.customerId) : null;
+                const customerName = customer?.name || 'Cliente General';
+                
+                return (
+                  <TableRow key={sale.id}>
+                    <TableCell className="font-medium">{sale.id}</TableCell>
+                    <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{customerName}</TableCell>
+                    <TableCell>RD$ {(sale.total - sale.tax).toLocaleString()}</TableCell>
+                    <TableCell>RD$ {sale.tax.toLocaleString()}</TableCell>
+                    <TableCell>RD$ {sale.total.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                        {sale.status === 'completed' ? 'Completada' :
+                         sale.status === 'credit' ? 'Crédito' :
+                         sale.status === 'returned' ? 'Devuelta' : 'Completada'}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

@@ -8,21 +8,31 @@ import { usePos } from '@/contexts/PosContext';
 import { ShoppingCart, Printer, FileDown, Search } from 'lucide-react';
 
 const SalesDetailReport = () => {
-  const { sales, products } = usePos();
+  const { sales, products, getCustomer } = usePos();
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   // Flatten all sale items with sale details
-  const allSaleItems = sales.flatMap(sale => 
-    sale.items.map(item => ({
+  const allSaleItems = sales.flatMap(sale => {
+    const customer = sale.customerId ? getCustomer(sale.customerId) : null;
+    const customerName = customer?.name || 'Cliente General';
+    const primaryPayment = sale.payments[0];
+    const paymentMethod = primaryPayment ? 
+      (primaryPayment.type === 'cash' ? 'Efectivo' : 
+       primaryPayment.type === 'card' ? 'Tarjeta' :
+       primaryPayment.type === 'transfer' ? 'Transferencia' :
+       primaryPayment.type === 'credit' ? 'Crédito' : 
+       primaryPayment.type.charAt(0).toUpperCase() + primaryPayment.type.slice(1)) : 'Efectivo';
+    
+    return sale.items.map(item => ({
       ...item,
       saleId: sale.id,
       saleDate: sale.date,
-      customerName: sale.customerName || 'Cliente General',
-      paymentMethod: sale.paymentMethod
-    }))
-  );
+      customerName,
+      paymentMethod
+    }));
+  });
 
   const filteredItems = allSaleItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());

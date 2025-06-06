@@ -7,7 +7,7 @@ import { usePos } from '@/contexts/PosContext';
 import { Receipt, Printer, FileDown } from 'lucide-react';
 
 const NCFSalesReport = () => {
-  const { sales } = usePos();
+  const { sales, getCustomer } = usePos();
 
   return (
     <div className="space-y-6">
@@ -43,16 +43,21 @@ const NCFSalesReport = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.map((sale) => (
-                <TableRow key={sale.id}>
-                  <TableCell>B01{sale.id.padStart(8, '0')}</TableCell>
-                  <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
-                  <TableCell>{sale.customerName || 'Cliente General'}</TableCell>
-                  <TableCell>RD$ {(sale.total - sale.tax).toLocaleString()}</TableCell>
-                  <TableCell>RD$ {sale.tax.toLocaleString()}</TableCell>
-                  <TableCell>RD$ {sale.total.toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
+              {sales.map((sale) => {
+                const customer = sale.customerId ? getCustomer(sale.customerId) : null;
+                const customerName = customer?.name || 'Cliente General';
+                
+                return (
+                  <TableRow key={sale.id}>
+                    <TableCell>B01{sale.id.padStart(8, '0')}</TableCell>
+                    <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{customerName}</TableCell>
+                    <TableCell>RD$ {(sale.total - sale.tax).toLocaleString()}</TableCell>
+                    <TableCell>RD$ {sale.tax.toLocaleString()}</TableCell>
+                    <TableCell>RD$ {sale.total.toLocaleString()}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
