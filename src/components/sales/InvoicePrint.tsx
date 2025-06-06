@@ -33,7 +33,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ sale, customer, onPrint }) 
       payments: sale.payments.map(payment => ({
         type: payment.type,
         amount: payment.amount,
-        reference: payment.reference
+        reference: payment.reference || `AUTO-${Date.now()}`
       })),
       status: sale.status
     });
@@ -124,14 +124,15 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ sale, customer, onPrint }) 
 
           <div class="payments">
             <strong>FORMAS DE PAGO:</strong><br>
-            ${sale.payments.map(payment => `
-              ${payment.type === 'cash' ? 'Efectivo' : 
-                payment.type === 'card' ? 'Tarjeta' : 
-                payment.type === 'transfer' ? 'Transferencia' : 
-                payment.type === 'credit' ? 'Crédito' : 
-                payment.type}: RD$ ${payment.amount.toLocaleString()}
-              ${payment.reference ? ` (Ref: ${payment.reference})` : ''}<br>
-            `).join('')}
+            ${sale.payments.map(payment => {
+              const paymentType = payment.type === 'cash' ? 'Efectivo' : 
+                               payment.type === 'card' ? 'Tarjeta' : 
+                               payment.type === 'transfer' ? 'Transferencia' : 
+                               payment.type === 'credit' ? 'Crédito' : 
+                               payment.type;
+              const reference = payment.reference ? ` (Ref: ${payment.reference})` : '';
+              return `${paymentType}: RD$ ${payment.amount.toLocaleString()}${reference}<br>`;
+            }).join('')}
           </div>
 
           ${sale.dueDate ? `

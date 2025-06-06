@@ -4,9 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { usePos } from '@/contexts/PosContext';
-import { User, UserPlus } from 'lucide-react';
+import { UserPlus, Phone, Mail, CreditCard, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface QuickCustomerModalProps {
@@ -23,11 +23,12 @@ const QuickCustomerModal: React.FC<QuickCustomerModalProps> = ({
   const { addCustomer } = usePos();
   const [formData, setFormData] = useState({
     name: '',
-    document: '',
-    phone: '',
     email: '',
-    isWholesale: false,
-    creditLimit: ''
+    phone: '',
+    document: '',
+    address: '',
+    creditLimit: '',
+    isWholesale: false
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -38,38 +39,49 @@ const QuickCustomerModal: React.FC<QuickCustomerModalProps> = ({
       return;
     }
 
-    const customerData = {
-      name: formData.name.trim(),
-      document: formData.document.trim() || undefined,
-      phone: formData.phone.trim() || undefined,
-      email: formData.email.trim() || undefined,
-      isWholesale: formData.isWholesale,
-      creditLimit: formData.creditLimit ? parseFloat(formData.creditLimit) : undefined
-    };
+    try {
+      const newCustomer = {
+        name: formData.name.trim(),
+        email: formData.email.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+        document: formData.document.trim() || undefined,
+        address: formData.address.trim() || undefined,
+        creditLimit: parseFloat(formData.creditLimit) || 0,
+        creditBalance: 0,
+        isWholesale: formData.isWholesale,
+        totalPurchases: 0,
+        lastPurchase: undefined
+      };
 
-    addCustomer(customerData);
-    
-    // Generate a temporary ID (in real app this would come from the database)
-    const customerId = Date.now().toString();
-    
-    toast.success('Cliente creado exitosamente');
-    onCustomerCreated(customerId);
-    
-    // Reset form
-    setFormData({
-      name: '',
-      document: '',
-      phone: '',
-      email: '',
-      isWholesale: false,
-      creditLimit: ''
-    });
-    
-    onClose();
+      addCustomer(newCustomer);
+      
+      // Generate ID for the new customer (in real app this would come from the addCustomer function)
+      const customerId = Date.now().toString();
+      
+      toast.success('Cliente creado exitosamente');
+      onCustomerCreated(customerId);
+      onClose();
+      
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        document: '',
+        address: '',
+        creditLimit: '',
+        isWholesale: false
+      });
+    } catch (error) {
+      toast.error('Error al crear el cliente');
+    }
   };
 
-  const handleChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   return (
@@ -83,76 +95,126 @@ const QuickCustomerModal: React.FC<QuickCustomerModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Nombre - Required */}
           <div>
-            <Label htmlFor="name">Nombre Completo *</Label>
+            <Label htmlFor="name" className="text-sm font-medium">
+              Nombre Completo *
+            </Label>
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
+              onChange={(e) => handleInputChange('name', e.target.value)}
               placeholder="Nombre del cliente"
               required
+              className="mt-1"
             />
           </div>
 
+          {/* Documento */}
           <div>
-            <Label htmlFor="document">Documento (Cédula/RNC)</Label>
+            <Label htmlFor="document" className="text-sm font-medium">
+              Documento (Cédula/RNC)
+            </Label>
             <Input
               id="document"
               value={formData.document}
-              onChange={(e) => handleChange('document', e.target.value)}
+              onChange={(e) => handleInputChange('document', e.target.value)}
               placeholder="001-1234567-8"
+              className="mt-1"
             />
           </div>
 
+          {/* Teléfono */}
           <div>
-            <Label htmlFor="phone">Teléfono</Label>
-            <Input
-              id="phone"
-              value={formData.phone}
-              onChange={(e) => handleChange('phone', e.target.value)}
-              placeholder="809-555-1234"
-            />
+            <Label htmlFor="phone" className="text-sm font-medium">
+              Teléfono
+            </Label>
+            <div className="relative mt-1">
+              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="809-555-1234"
+                className="pl-10"
+              />
+            </div>
           </div>
 
+          {/* Email */}
           <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleChange('email', e.target.value)}
-              placeholder="cliente@email.com"
-            />
+            <Label htmlFor="email" className="text-sm font-medium">
+              Correo Electrónico
+            </Label>
+            <div className="relative mt-1">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="cliente@email.com"
+                className="pl-10"
+              />
+            </div>
           </div>
 
-          <div className="space-y-4 border-t pt-4">
-            <div>
-              <Label htmlFor="creditLimit">Límite de Crédito (RD$)</Label>
+          {/* Dirección */}
+          <div>
+            <Label htmlFor="address" className="text-sm font-medium">
+              Dirección
+            </Label>
+            <div className="relative mt-1">
+              <MapPin className="absolute left-3 top-3 text-gray-400 h-4 w-4" />
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                placeholder="Dirección completa"
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          {/* Límite de Crédito */}
+          <div>
+            <Label htmlFor="creditLimit" className="text-sm font-medium">
+              Límite de Crédito (RD$)
+            </Label>
+            <div className="relative mt-1">
+              <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 id="creditLimit"
                 type="number"
                 value={formData.creditLimit}
-                onChange={(e) => handleChange('creditLimit', e.target.value)}
+                onChange={(e) => handleInputChange('creditLimit', e.target.value)}
                 placeholder="0.00"
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="isWholesale">Cliente Mayorista</Label>
-              <Switch
-                id="isWholesale"
-                checked={formData.isWholesale}
-                onCheckedChange={(checked) => handleChange('isWholesale', checked)}
+                min="0"
+                step="0.01"
+                className="pl-10"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+          {/* Cliente Mayorista */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="isWholesale"
+              checked={formData.isWholesale}
+              onCheckedChange={(checked) => handleInputChange('isWholesale', checked as boolean)}
+            />
+            <Label htmlFor="isWholesale" className="text-sm font-medium">
+              Cliente Mayorista
+            </Label>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancelar
             </Button>
-            <Button type="submit">
-              <User className="h-4 w-4 mr-2" />
+            <Button type="submit" className="flex-1">
+              <UserPlus className="h-4 w-4 mr-2" />
               Crear Cliente
             </Button>
           </div>

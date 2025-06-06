@@ -15,7 +15,7 @@ interface PosContextType {
   
   // Customers
   customers: Customer[];
-  addCustomer: (customer: Omit<Customer, 'id'>) => void;
+  addCustomer: (customer: Omit<Customer, 'id'>) => string;
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
   getCustomer: (id: string) => Customer | undefined;
   
@@ -238,6 +238,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       creditLimit: customer.creditLimit || 0 
     };
     setCustomers(prev => [...prev, newCustomer]);
+    return newCustomer.id; // Return the new customer ID
   };
 
   const updateCustomer = (id: string, updates: Partial<Customer>) => {
