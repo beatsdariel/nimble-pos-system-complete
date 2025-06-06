@@ -89,7 +89,7 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
   };
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto">
+    <div className="relative w-full">
       {/* Search Input */}
       <div className="relative">
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -99,7 +99,7 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
           value={searchTerm}
           onChange={(e) => handleSearch(e.target.value)}
           onKeyDown={handleKeyPress}
-          className="pl-12 pr-12 h-12 text-lg shadow-lg border-2 border-gray-200 focus:border-blue-500"
+          className="pl-12 pr-12 h-12 text-base bg-white border-2 border-gray-300 focus:border-blue-500 rounded-lg"
           autoComplete="off"
         />
         <Barcode className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
