@@ -1,14 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePos } from '@/contexts/PosContext';
 import { PaymentMethod, Customer, Sale } from '@/types/pos';
 import { CreditCard, DollarSign, Banknote, Receipt, Zap, Calendar, ArrowLeftCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import CreditNoteModal from '@/components/returns/CreditNoteModal';
 import InvoicePrint from './InvoicePrint';
 
@@ -32,6 +33,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [cashAmount, setCashAmount] = useState<string>('');
   const [cardAmount, setCardAmount] = useState<string>('');
   const [cardReference, setCardReference] = useState<string>('');
+  const [cardType, setCardType] = useState<'visa' | 'mastercard' | 'amex' | 'discover' | 'other'>('visa');
   const [useCredit, setUseCredit] = useState<boolean>(false);
   const [returnPayment, setReturnPayment] = useState<boolean>(returnAmount > 0);
   const [showCreditNotes, setShowCreditNotes] = useState<boolean>(false);
@@ -50,6 +52,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       setCashAmount('');
       setCardAmount('');
       setCardReference('');
+      setCardType('visa');
       setUseCredit(false);
       
       if (returnAmount > 0 && returnId) {
@@ -73,6 +76,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     setCashAmount('');
     setCardAmount('');
     setCardReference('');
+    setCardType('visa');
     setUseCredit(false);
     setReturnPayment(false);
   };
@@ -98,7 +102,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       addPayment({ 
         type: 'card', 
         amount, 
-        reference: cardReference || `CARD-${Date.now()}` 
+        reference: cardReference || `CARD-${Date.now()}`,
+        cardType 
       });
       setCardAmount('');
       setCardReference('');
@@ -194,16 +199,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     setCashAmount('');
     setCardAmount('');
     setCardReference('');
+    setCardType('visa');
     setUseCredit(false);
     setReturnPayment(false);
     onClose();
-  };
-
-  // Helper to get date for next month (for credit due date)
-  const getNextMonth = () => {
-    const date = new Date();
-    date.setMonth(date.getMonth() + 1);
-    return date.toISOString();
   };
 
   // Determine if credit payment is available
@@ -298,6 +297,23 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                       onChange={(e) => setCardAmount(e.target.value)}
                     />
                   </div>
+                  
+                  <div>
+                    <Label htmlFor="card-type">Tipo de Tarjeta</Label>
+                    <Select value={cardType} onValueChange={(value: 'visa' | 'mastercard' | 'amex' | 'discover' | 'other') => setCardType(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="visa">Visa</SelectItem>
+                        <SelectItem value="mastercard">Mastercard</SelectItem>
+                        <SelectItem value="amex">American Express</SelectItem>
+                        <SelectItem value="discover">Discover</SelectItem>
+                        <SelectItem value="other">Otra</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
                   <div>
                     <Label htmlFor="card-reference">Referencia (Opcional)</Label>
                     <Input
@@ -450,7 +466,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                       let paymentMethod = "";
                       switch(payment.type) {
                         case 'cash': paymentMethod = "Efectivo"; break;
-                        case 'card': paymentMethod = "Tarjeta"; break;
+                        case 'card': paymentMethod = `Tarjeta ${payment.cardType ? `(${payment.cardType.toUpperCase()})` : ''}`; break;
                         case 'credit': paymentMethod = "Crédito"; break;
                         case 'return': paymentMethod = "Devolución"; break;
                         case 'credit-note': paymentMethod = "Nota de Crédito"; break;

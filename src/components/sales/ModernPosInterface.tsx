@@ -8,7 +8,9 @@ import { usePos } from '@/contexts/PosContext';
 import CentralProductSearch from './CentralProductSearch';
 import CustomerSelector from './CustomerSelector';
 import HoldOrderManager from './HoldOrderManager';
-import { ShoppingCart, Trash2, User, Clock, Receipt, Minus, Plus, BarChart3 } from 'lucide-react';
+import QuickCustomerModal from './QuickCustomerModal';
+import CollectAccountModal from './CollectAccountModal';
+import { ShoppingCart, Trash2, User, Clock, Receipt, Minus, Plus, BarChart3, UserPlus, DollarSign, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ModernPosInterfaceProps {
@@ -43,6 +45,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
   } = usePos();
 
   const [showHoldOrders, setShowHoldOrders] = useState(false);
+  const [showQuickCustomer, setShowQuickCustomer] = useState(false);
+  const [showCollectAccount, setShowCollectAccount] = useState(false);
 
   const selectedCustomerData = selectedCustomer && selectedCustomer !== 'no-customer' 
     ? getCustomer(selectedCustomer) 
@@ -71,6 +75,11 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
       }
     });
     toast.success(`Pedido ${order.id} reanudado`);
+  };
+
+  const handleCustomerCreated = (customerId: string) => {
+    onCustomerChange(customerId);
+    toast.success('Cliente creado y seleccionado');
   };
 
   const currentDate = new Date().toLocaleDateString();
@@ -265,18 +274,15 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Customer Assignment */}
-          <div className="p-4 border-b">
+          {/* Customer Management */}
+          <div className="p-4 border-b space-y-3">
             <Button
               variant="outline"
-              className="w-full flex items-center gap-2 mb-3"
-              onClick={() => {
-                // Customer assignment modal
-                toast.info('Módulo de asignación de cliente');
-              }}
+              className="w-full flex items-center gap-2"
+              onClick={() => setShowQuickCustomer(true)}
             >
-              <User className="h-4 w-4" />
-              ASIGNAR CLIENTE
+              <UserPlus className="h-4 w-4" />
+              AGREGAR CLIENTE
             </Button>
             
             <CustomerSelector
@@ -296,6 +302,29 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               <Clock className="h-4 w-4" />
               VER PEDIDOS ABIERTOS
             </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full flex items-center gap-2"
+              onClick={() => {
+                toast.info('Módulo de buscar pedidos');
+              }}
+            >
+              <Search className="h-4 w-4" />
+              BUSCAR PEDIDOS
+            </Button>
+          </div>
+
+          {/* Account Management */}
+          <div className="p-4 border-b space-y-3">
+            <Button
+              variant="outline"
+              className="w-full bg-green-100 hover:bg-green-200 border-green-300"
+              onClick={() => setShowCollectAccount(true)}
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              COBRAR CUENTAS
+            </Button>
           </div>
 
           {/* Sales History */}
@@ -306,19 +335,6 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             >
               <Receipt className="h-4 w-4" />
               HISTORIAL DE VENTAS
-            </Button>
-          </div>
-
-          {/* Account Management */}
-          <div className="p-4 border-b space-y-3">
-            <Button
-              variant="outline"
-              className="w-full bg-green-100 hover:bg-green-200 border-green-300"
-              onClick={() => {
-                toast.info('Módulo de cobrar cuenta');
-              }}
-            >
-              💰 COBRAR CUENTA (F4)
             </Button>
           </div>
 
@@ -364,11 +380,22 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Hold Orders Manager */}
+      {/* Modals */}
       <HoldOrderManager
         open={showHoldOrders}
         onClose={() => setShowHoldOrders(false)}
         onResumeOrder={handleResumeOrder}
+      />
+      
+      <QuickCustomerModal
+        open={showQuickCustomer}
+        onClose={() => setShowQuickCustomer(false)}
+        onCustomerCreated={handleCustomerCreated}
+      />
+      
+      <CollectAccountModal
+        open={showCollectAccount}
+        onClose={() => setShowCollectAccount(false)}
       />
     </div>
   );

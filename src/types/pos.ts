@@ -46,6 +46,7 @@ export interface PaymentMethod {
   reference?: string;
   returnId?: string;
   creditNoteId?: string;
+  cardType?: 'visa' | 'mastercard' | 'amex' | 'discover' | 'other';
 }
 
 export interface Sale {
@@ -102,4 +103,38 @@ export interface InventoryMovement {
   reason?: string;
   date: string;
   userId: string;
+}
+
+export interface Shift {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+}
+
+export interface CashSession {
+  id: string;
+  userId: string;
+  shiftId: string;
+  openingAmount: number;
+  openingTime: string;
+  closingAmount?: number;
+  closingTime?: string;
+  status: 'open' | 'closed';
+  sales: Sale[];
+  totalSales: number;
+  totalCash: number;
+  totalCard: number;
+  totalCredit: number;
+}
+
+export interface HeldOrder {
+  id: string;
+  items: CartItem[];
+  customerId?: string;
+  total: number;
+  createdAt: string;
+  createdBy: string;
+  note?: string;
 }
