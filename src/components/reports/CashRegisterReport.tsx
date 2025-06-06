@@ -203,7 +203,7 @@ const CashRegisterReport = () => {
                 </div>
               </div>
             )}
-          </Card>
+          </CardContent>
         </Card>
 
         {/* Actions */}
