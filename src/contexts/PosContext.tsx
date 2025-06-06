@@ -1,6 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { useSettings } from './SettingsContext';
 import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote } from '@/types/pos';
 import { Supplier, Purchase, InventoryCount } from '@/types/inventory';
 import { User } from '@/types/auth';
@@ -74,6 +74,8 @@ const PosContext = createContext<PosContextType | undefined>(undefined);
 
 export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, addCashEntry } = useAuth();
+  const { createReceivableFromCreditSale, createPayableFromPurchase } = useSettings();
+  
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -190,6 +192,23 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     ];
     setCustomers(sampleCustomers);
+
+    const sampleSuppliers: Supplier[] = [
+      {
+        id: '1',
+        name: 'Distribuidora Nacional',
+        contactName: 'Carlos Rodriguez',
+        email: 'carlos@distribuidora.com',
+        phone: '809-555-9999',
+        address: 'Zona Industrial, Santo Domingo',
+        taxId: '131-123456-7',
+        paymentTerms: '30 días',
+        creditLimit: 50000,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      }
+    ];
+    setSuppliers(sampleSuppliers);
   }, []);
 
   // Product functions
@@ -239,7 +258,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       
       if (existingItem) {
-        // Check stock availability
         const newQuantity = existingItem.quantity + quantity;
         if (newQuantity > product.stock) {
           console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
@@ -257,7 +275,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       }
       
-      // Check stock for new item
       if (quantity > product.stock) {
         console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
         quantity = product.stock;
@@ -282,7 +299,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    // Check stock availability
     const product = getProduct(productId);
     if (product && quantity > product.stock) {
       console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
@@ -361,7 +377,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const totalPaid = updatedPayments.reduce((sum, p) => sum + p.amount, 0);
           const newStatus = totalPaid >= sale.total ? 'paid-credit' : 'credit';
           
-          // Update customer credit balance
           if (sale.customerId && newStatus === 'paid-credit') {
             const customer = getCustomer(sale.customerId);
             if (customer) {
@@ -381,7 +396,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     });
 
-    // Register cash entry if payment was cash
     if (paymentMethod.type === 'cash' && currentUser) {
       addCashEntry({
         type: 'sale',
@@ -414,12 +428,28 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addPurchase = (purchase: Omit<Purchase, 'id' | 'userId'>) => {
     if (!currentUser) return;
     
+    const newPurchaseId = `PUR-${Date.now()}`;
     const newPurchase: Purchase = {
       ...purchase,
-      id: Date.now().toString(),
+      id: newPurchaseId,
       userId: currentUser.id
     };
     setPurchases(prev => [...prev, newPurchase]);
+    
+    // Auto create accounts payable for credit purchases
+    if (purchase.paymentType === 'credit') {
+      const supplier = getSupplier(purchase.supplierId);
+      if (supplier) {
+        const dueDate = purchase.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        createPayableFromPurchase(
+          newPurchaseId,
+          supplier.id,
+          supplier.name,
+          purchase.total,
+          dueDate
+        );
+      }
+    }
     
     // Update product costs and stock if purchase is received
     if (purchase.status === 'received') {
@@ -440,7 +470,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (p.id === id) {
         const updatedPurchase = { ...p, ...updates };
         
-        // Update product costs and stock if status changed to received
         if (updates.status === 'received' && p.status !== 'received') {
           updatedPurchase.items.forEach(item => {
             const product = getProduct(item.productId);
@@ -483,20 +512,14 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const processReturn = (saleId: string, items: ReturnedItem[]) => {
     if (!currentUser) return "";
     
-    // Find original sale
     const originalSale = getSale(saleId);
     if (!originalSale) return "";
 
-    // Create return ID
     const returnId = `RET-${Date.now()}`;
-    
-    // Calculate total return amount
     const returnTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
-    // Set the returnItems for reference
     setReturnedItems([...returnedItems, ...items]);
     
-    // Update the original sale status
     setSales(prev => prev.map(sale => {
       if (sale.id === saleId) {
         const allItemsReturned = sale.items.every(item => {
@@ -513,7 +536,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return sale;
     }));
     
-    // Update product stock
     items.forEach(item => {
       updateProduct(item.productId, {
         stock: (getProduct(item.productId)?.stock || 0) + item.quantity
@@ -536,17 +558,27 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     setSales(prev => [...prev, newSale]);
     
-    // Update customer credit balance if this is a credit sale
+    // Auto create accounts receivable for credit sales
     if (newSale.status === 'credit' && newSale.customerId) {
       const customer = getCustomer(newSale.customerId);
       if (customer) {
         updateCustomer(customer.id, {
           creditBalance: (customer.creditBalance || 0) + newSale.total
         });
+        
+        // Create receivable account automatically
+        const dueDate = newSale.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        createReceivableFromCreditSale(
+          newSaleId,
+          customer.id,
+          customer.name,
+          newSale.total,
+          dueDate
+        );
       }
     }
     
-    // Process credit note payments
+    // Credit Note processing
     const creditNotePayments = sale.payments.filter(p => p.type === 'credit-note');
     creditNotePayments.forEach(payment => {
       if (payment.creditNoteId) {
@@ -554,7 +586,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
     
-    // Register cash entry if cash payment
+    // Cash entry if cash payment
     const cashPayments = sale.payments.filter(p => p.type === 'cash');
     if (cashPayments.length > 0 && currentUser) {
       const totalCash = cashPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -577,8 +609,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     
     clearCart();
-    
-    // Return the completed sale for printing
     return newSale;
   };
 

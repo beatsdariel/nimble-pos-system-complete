@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { 
@@ -7,7 +6,8 @@ import {
   SystemUser, 
   SystemSettings, 
   AccountsReceivable, 
-  AccountsPayable 
+  AccountsPayable,
+  PaymentRecord
 } from '@/types/settings';
 import { toast } from 'sonner';
 
@@ -32,13 +32,19 @@ interface SettingsContextType {
   
   // Accounts Receivable
   accountsReceivable: AccountsReceivable[];
-  addAccountReceivable: (account: Omit<AccountsReceivable, 'id' | 'createdAt'>) => void;
+  addAccountReceivable: (account: Omit<AccountsReceivable, 'id' | 'createdAt' | 'paymentHistory'>) => void;
   updateAccountReceivable: (id: string, updates: Partial<AccountsReceivable>) => void;
+  addReceivablePayment: (accountId: string, payment: Omit<PaymentRecord, 'id'>) => void;
   
   // Accounts Payable
   accountsPayable: AccountsPayable[];
-  addAccountPayable: (account: Omit<AccountsPayable, 'id' | 'createdAt'>) => void;
+  addAccountPayable: (account: Omit<AccountsPayable, 'id' | 'createdAt' | 'paymentHistory'>) => void;
   updateAccountPayable: (id: string, updates: Partial<AccountsPayable>) => void;
+  addPayablePayment: (accountId: string, payment: Omit<PaymentRecord, 'id'>) => void;
+  
+  // Auto Integration Functions
+  createReceivableFromCreditSale: (saleId: string, customerId: string, customerName: string, amount: number, dueDate: string) => void;
+  createPayableFromPurchase: (purchaseId: string, supplierId: string, supplierName: string, amount: number, dueDate: string) => void;
   
   // System Actions
   createBackup: () => void;
@@ -156,12 +162,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     toast.success('Usuario eliminado');
   };
 
-  // Accounts Receivable
-  const addAccountReceivable = (account: Omit<AccountsReceivable, 'id' | 'createdAt'>) => {
+  // Enhanced Accounts Receivable functions
+  const addAccountReceivable = (account: Omit<AccountsReceivable, 'id' | 'createdAt' | 'paymentHistory'>) => {
     const newAccount: AccountsReceivable = {
       ...account,
       id: Date.now().toString(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      paymentHistory: []
     };
     setAccountsReceivable(prev => [...prev, newAccount]);
     toast.success('Cuenta por cobrar agregada');
@@ -174,12 +181,43 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     toast.success('Cuenta por cobrar actualizada');
   };
 
-  // Accounts Payable
-  const addAccountPayable = (account: Omit<AccountsPayable, 'id' | 'createdAt'>) => {
+  const addReceivablePayment = (accountId: string, payment: Omit<PaymentRecord, 'id'>) => {
+    if (!currentUser) return;
+
+    const newPayment: PaymentRecord = {
+      ...payment,
+      id: Date.now().toString(),
+      userId: currentUser.id
+    };
+
+    setAccountsReceivable(prev => prev.map(account => {
+      if (account.id === accountId) {
+        const newPaidAmount = account.paidAmount + payment.amount;
+        const newRemainingAmount = account.amount - newPaidAmount;
+        const newStatus = newRemainingAmount <= 0 ? 'paid' : 
+                         newPaidAmount > 0 ? 'partial' : 'pending';
+
+        return {
+          ...account,
+          paidAmount: newPaidAmount,
+          remainingAmount: Math.max(0, newRemainingAmount),
+          status: newStatus,
+          paymentHistory: [...account.paymentHistory, newPayment]
+        };
+      }
+      return account;
+    }));
+
+    toast.success('Pago registrado exitosamente');
+  };
+
+  // Enhanced Accounts Payable functions
+  const addAccountPayable = (account: Omit<AccountsPayable, 'id' | 'createdAt' | 'paymentHistory'>) => {
     const newAccount: AccountsPayable = {
       ...account,
       id: Date.now().toString(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      paymentHistory: []
     };
     setAccountsPayable(prev => [...prev, newAccount]);
     toast.success('Cuenta por pagar agregada');
@@ -190,6 +228,79 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       account.id === id ? { ...account, ...updates } : account
     ));
     toast.success('Cuenta por pagar actualizada');
+  };
+
+  const addPayablePayment = (accountId: string, payment: Omit<PaymentRecord, 'id'>) => {
+    if (!currentUser) return;
+
+    const newPayment: PaymentRecord = {
+      ...payment,
+      id: Date.now().toString(),
+      userId: currentUser.id
+    };
+
+    setAccountsPayable(prev => prev.map(account => {
+      if (account.id === accountId) {
+        const newPaidAmount = account.paidAmount + payment.amount;
+        const newRemainingAmount = account.amount - newPaidAmount;
+        const newStatus = newRemainingAmount <= 0 ? 'paid' : 
+                         newPaidAmount > 0 ? 'partial' : 'pending';
+
+        return {
+          ...account,
+          paidAmount: newPaidAmount,
+          remainingAmount: Math.max(0, newRemainingAmount),
+          status: newStatus,
+          paymentHistory: [...account.paymentHistory, newPayment]
+        };
+      }
+      return account;
+    }));
+
+    toast.success('Pago registrado exitosamente');
+  };
+
+  // Auto Integration Functions
+  const createReceivableFromCreditSale = (saleId: string, customerId: string, customerName: string, amount: number, dueDate: string) => {
+    const newAccount: AccountsReceivable = {
+      id: Date.now().toString(),
+      customerId,
+      customerName,
+      invoiceNumber: saleId,
+      amount,
+      dueDate,
+      status: 'pending',
+      paidAmount: 0,
+      remainingAmount: amount,
+      description: `Venta a crédito - ${saleId}`,
+      createdAt: new Date().toISOString(),
+      paymentHistory: [],
+      saleId
+    };
+    
+    setAccountsReceivable(prev => [...prev, newAccount]);
+    console.log(`Cuenta por cobrar creada automáticamente para venta a crédito: ${saleId}`);
+  };
+
+  const createPayableFromPurchase = (purchaseId: string, supplierId: string, supplierName: string, amount: number, dueDate: string) => {
+    const newAccount: AccountsPayable = {
+      id: Date.now().toString(),
+      supplierId,
+      supplierName,
+      invoiceNumber: purchaseId,
+      amount,
+      dueDate,
+      status: 'pending',
+      paidAmount: 0,
+      remainingAmount: amount,
+      description: `Compra a crédito - ${purchaseId}`,
+      createdAt: new Date().toISOString(),
+      paymentHistory: [],
+      purchaseId
+    };
+    
+    setAccountsPayable(prev => [...prev, newAccount]);
+    console.log(`Cuenta por pagar creada automáticamente para compra: ${purchaseId}`);
   };
 
   // System Actions
@@ -237,7 +348,6 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const clearSalesData = () => {
-    // This would clear sales data from POS context
     toast.success('Datos de ventas limpiados');
   };
 
@@ -256,9 +366,13 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       accountsReceivable,
       addAccountReceivable,
       updateAccountReceivable,
+      addReceivablePayment,
       accountsPayable,
       addAccountPayable,
       updateAccountPayable,
+      addPayablePayment,
+      createReceivableFromCreditSale,
+      createPayableFromPurchase,
       createBackup,
       restoreBackup,
       clearSalesData

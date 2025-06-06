@@ -52,6 +52,16 @@ export interface SystemSettings {
   updatedAt: string;
 }
 
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: 'cash' | 'card' | 'transfer' | 'check';
+  reference?: string;
+  notes?: string;
+  userId: string;
+}
+
 export interface AccountsReceivable {
   id: string;
   customerId: string;
@@ -64,6 +74,8 @@ export interface AccountsReceivable {
   remainingAmount: number;
   description: string;
   createdAt: string;
+  paymentHistory: PaymentRecord[];
+  saleId?: string; // Link to original sale if applicable
 }
 
 export interface AccountsPayable {
@@ -78,4 +90,6 @@ export interface AccountsPayable {
   remainingAmount: number;
   description: string;
   createdAt: string;
+  paymentHistory: PaymentRecord[];
+  purchaseId?: string; // Link to original purchase if applicable
 }
