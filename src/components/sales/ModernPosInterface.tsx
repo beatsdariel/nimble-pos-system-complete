@@ -11,6 +11,7 @@ import HoldOrderManager from './HoldOrderManager';
 import QuickCustomerModal from './QuickCustomerModal';
 import CollectAccountModal from './CollectAccountModal';
 import CashClosureModal from '../cash/CashClosureModal';
+import AccessKeyModal from '../common/AccessKeyModal';
 import { ShoppingCart, Trash2, User, Clock, Receipt, Minus, Plus, BarChart3, UserPlus, DollarSign, Search, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -45,7 +46,9 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     getProduct,
     currentShift,
     processBarcodeCommand,
-    addCashClosure
+    addCashClosure,
+    holdCurrentOrder,
+    validateAccessKey
   } = usePos();
 
   const [showHoldOrders, setShowHoldOrders] = useState(false);
@@ -53,12 +56,15 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
   const [showCollectAccount, setShowCollectAccount] = useState(false);
   const [showCashClosure, setShowCashClosure] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{action: string, callback: () => void} | null>(null);
+  const [holdOrderNote, setHoldOrderNote] = useState('');
 
   const selectedCustomerData = selectedCustomer && selectedCustomer !== 'no-customer' 
     ? getCustomer(selectedCustomer) 
     : null;
 
-  // Manejar entrada de código de barras y comandos
+  // Handle barcode submission
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (barcodeInput.trim()) {
@@ -76,20 +82,45 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     }
   };
 
-  const handleClearCart = () => {
-    clearCart();
-    toast.success('Carrito limpiado');
+  const requestAccess = (action: string, title: string, callback: () => void) => {
+    setPendingAction({ action, callback });
+    setShowAccessModal(true);
   };
 
-  const handleResumeOrder = (order: any) => {
-    clearCart();
-    order.items.forEach((item: any) => {
-      const product = getProduct(item.productId);
-      if (product) {
-        addToCart(product, item.quantity, item.isWholesalePrice);
+  const handleAccessSuccess = () => {
+    if (pendingAction) {
+      pendingAction.callback();
+      setPendingAction(null);
+    }
+  };
+
+  const handleClearCart = () => {
+    requestAccess('clear-cart', 'Limpiar Todo', () => {
+      clearCart();
+      toast.success('Carrito limpiado');
+    });
+  };
+
+  const handleDeleteLine = () => {
+    requestAccess('delete-line', 'Borrar Línea', () => {
+      if (cart.length > 0) {
+        const lastItem = cart[cart.length - 1];
+        removeFromCart(lastItem.productId);
+        toast.success('Última línea borrada');
       }
     });
-    toast.success(`Pedido ${order.id} reanudado`);
+  };
+
+  const handleShowHistory = () => {
+    requestAccess('sales-history', 'Historial de Ventas', onShowHistory);
+  };
+
+  const handleShowQuickCustomer = () => {
+    requestAccess('add-customer', 'Agregar Cliente', () => setShowQuickCustomer(true));
+  };
+
+  const handleShowCollectAccount = () => {
+    requestAccess('collect-accounts', 'Cobrar Cuentas', () => setShowCollectAccount(true));
   };
 
   const handleCustomerCreated = (customerId: string) => {
@@ -99,6 +130,12 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
 
   const handleCashClosure = (closureData: any) => {
     addCashClosure(closureData);
+  };
+
+  const handleHoldOrder = () => {
+    const prompt = window.prompt('Ingrese una nota para el pedido (opcional):');
+    const note = prompt || '';
+    holdCurrentOrder(note);
   };
 
   const currentDate = new Date().toLocaleDateString();
@@ -131,9 +168,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             <Button
               variant="outline"
               className="flex items-center gap-2"
-              onClick={() => {
-                toast.info('Pedido guardado como abierto');
-              }}
+              onClick={handleHoldOrder}
+              disabled={cart.length === 0}
             >
               <Clock className="h-4 w-4" />
               DEJAR ABIERTO
@@ -311,7 +347,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               <Button
                 variant="outline"
                 className="w-full flex items-center gap-2"
-                onClick={() => setShowQuickCustomer(true)}
+                onClick={handleShowQuickCustomer}
               >
                 <UserPlus className="h-4 w-4" />
                 AGREGAR CLIENTE
@@ -338,9 +374,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               <Button
                 variant="outline"
                 className="w-full flex items-center gap-2"
-                onClick={() => {
-                  toast.info('Módulo de buscar pedidos');
-                }}
+                onClick={() => setShowHoldOrders(true)}
               >
                 <Search className="h-4 w-4" />
                 BUSCAR PEDIDOS
@@ -352,7 +386,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               <Button
                 variant="outline"
                 className="w-full bg-green-100 hover:bg-green-200 border-green-300"
-                onClick={() => setShowCollectAccount(true)}
+                onClick={handleShowCollectAccount}
               >
                 <DollarSign className="h-4 w-4 mr-2" />
                 COBRAR CUENTAS
@@ -375,7 +409,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             <div className="p-4 border-b">
               <Button
                 className="w-full flex items-center gap-2 bg-blue-500 hover:bg-blue-600"
-                onClick={onShowHistory}
+                onClick={handleShowHistory}
               >
                 <Receipt className="h-4 w-4" />
                 HISTORIAL DE VENTAS
@@ -387,13 +421,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               <Button
                 variant="outline"
                 className="w-full bg-red-100 hover:bg-red-200 border-red-300"
-                onClick={() => {
-                  if (cart.length > 0) {
-                    const lastItem = cart[cart.length - 1];
-                    removeFromCart(lastItem.productId);
-                    toast.success('Última línea borrada');
-                  }
-                }}
+                onClick={handleDeleteLine}
               >
                 🗑️ BORRAR LÍNEA
               </Button>
@@ -426,7 +454,6 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
       <HoldOrderManager
         open={showHoldOrders}
         onClose={() => setShowHoldOrders(false)}
-        onResumeOrder={handleResumeOrder}
       />
       
       <QuickCustomerModal
@@ -445,6 +472,22 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
         onClose={() => setShowCashClosure(false)}
         onCloseCash={handleCashClosure}
         openingAmount={currentShift?.openingAmount || 0}
+      />
+
+      <AccessKeyModal
+        open={showAccessModal}
+        onClose={() => {
+          setShowAccessModal(false);
+          setPendingAction(null);
+        }}
+        onSuccess={handleAccessSuccess}
+        action={pendingAction?.action || ''}
+        title={pendingAction?.action === 'collect-accounts' ? 'Cobrar Cuentas' :
+               pendingAction?.action === 'sales-history' ? 'Historial de Ventas' :
+               pendingAction?.action === 'delete-line' ? 'Borrar Línea' :
+               pendingAction?.action === 'clear-cart' ? 'Limpiar Todo' :
+               pendingAction?.action === 'add-customer' ? 'Agregar Cliente' : 'Acción Protegida'}
+        validateKey={(key) => validateAccessKey(pendingAction?.action || '', key)}
       />
     </div>
   );

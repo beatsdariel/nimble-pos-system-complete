@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { Search, List, RotateCcw, Receipt, ShoppingCart } from 'lucide-react';
 import ReturnModal from '@/components/returns/ReturnModal';
+import AccessKeyModal from '../common/AccessKeyModal';
 
 interface SalesHistoryProps {
   open: boolean;
@@ -16,14 +17,24 @@ interface SalesHistoryProps {
 }
 
 const SalesHistory: React.FC<SalesHistoryProps> = ({ open, onClose, onSelectReturn }) => {
-  const { sales } = usePos();
+  const { sales, validateAccessKey } = usePos();
   const [searchTerm, setSearchTerm] = useState('');
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [pendingReturn, setPendingReturn] = useState<any>(null);
 
   const handleSelectSale = (sale: any) => {
-    setSelectedSale(sale);
-    setShowReturnModal(true);
+    setPendingReturn(sale);
+    setShowAccessModal(true);
+  };
+
+  const handleAccessSuccess = () => {
+    if (pendingReturn) {
+      setSelectedSale(pendingReturn);
+      setShowReturnModal(true);
+      setPendingReturn(null);
+    }
   };
 
   const filteredSales = sales.filter(sale => 
@@ -137,6 +148,19 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ open, onClose, onSelectRetu
         open={showReturnModal} 
         onClose={() => setShowReturnModal(false)} 
         sale={selectedSale}
+        onReturn={handleReturn}
+      />
+
+      <AccessKeyModal
+        open={showAccessModal}
+        onClose={() => {
+          setShowAccessModal(false);
+          setPendingReturn(null);
+        }}
+        onSuccess={handleAccessSuccess}
+        action="returns"
+        title="Devoluciones"
+        validateKey={(key) => validateAccessKey('returns', key)}
       />
     </>
   );

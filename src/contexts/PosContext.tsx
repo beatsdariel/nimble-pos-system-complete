@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { useSettings } from './SettingsContext';
-import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote } from '@/types/pos';
+import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote, HeldOrder } from '@/types/pos';
 import { Supplier, Purchase, InventoryCount } from '@/types/inventory';
 import { User } from '@/types/auth';
 import { toast } from 'sonner';
@@ -76,9 +76,29 @@ interface PosContextType {
   processBarcodeCommand: (input: string) => void;
   cashClosures: any[];
   addCashClosure: (closure: any) => void;
+  
+  // Held Orders
+  heldOrders: HeldOrder[];
+  holdCurrentOrder: (note?: string) => string;
+  resumeHeldOrder: (orderId: string) => void;
+  deleteHeldOrder: (orderId: string) => void;
+  searchHeldOrders: (searchTerm: string) => HeldOrder[];
+  
+  // Access Control
+  validateAccessKey: (action: string, key: string) => boolean;
 }
 
 const PosContext = createContext<PosContextType | undefined>(undefined);
+
+// Claves de acceso para módulos sensibles
+const ACCESS_KEYS = {
+  'collect-accounts': '1234',
+  'returns': '1234',
+  'sales-history': '1234',
+  'delete-line': '1234',
+  'clear-cart': '1234',
+  'add-customer': '1234'
+};
 
 export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, addCashEntry } = useAuth();
@@ -96,6 +116,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [cashClosures, setCashClosures] = useState<any[]>([]);
   const [pendingQuantity, setPendingQuantity] = useState<number | null>(null);
+  const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
 
   // Initialize with sample data
   useEffect(() => {
@@ -655,6 +676,70 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCashClosures(prev => [...prev, { ...closure, id: Date.now().toString() }]);
   };
 
+  // Held Orders functions
+  const holdCurrentOrder = (note?: string) => {
+    if (cart.length === 0) {
+      toast.error('No hay productos en el carrito para guardar');
+      return '';
+    }
+
+    const orderId = `HOLD-${Date.now()}`;
+    const total = cartTotal;
+    
+    const newHeldOrder: HeldOrder = {
+      id: orderId,
+      items: [...cart],
+      total,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser?.name || 'Usuario',
+      note: note || ''
+    };
+
+    setHeldOrders(prev => [...prev, newHeldOrder]);
+    clearCart();
+    toast.success(`Pedido ${orderId} guardado como abierto`);
+    return orderId;
+  };
+
+  const resumeHeldOrder = (orderId: string) => {
+    const order = heldOrders.find(o => o.id === orderId);
+    if (!order) {
+      toast.error('Pedido no encontrado');
+      return;
+    }
+
+    clearCart();
+    order.items.forEach(item => {
+      const product = getProduct(item.productId);
+      if (product) {
+        addToCart(product, item.quantity, item.isWholesalePrice);
+      }
+    });
+
+    setHeldOrders(prev => prev.filter(o => o.id !== orderId));
+    toast.success(`Pedido ${orderId} reanudado`);
+  };
+
+  const deleteHeldOrder = (orderId: string) => {
+    setHeldOrders(prev => prev.filter(o => o.id !== orderId));
+    toast.success(`Pedido ${orderId} eliminado`);
+  };
+
+  const searchHeldOrders = (searchTerm: string) => {
+    if (!searchTerm.trim()) return heldOrders;
+    
+    return heldOrders.filter(order => 
+      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.note?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.createdBy.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  // Access Control
+  const validateAccessKey = (action: string, key: string) => {
+    return ACCESS_KEYS[action as keyof typeof ACCESS_KEYS] === key;
+  };
+
   const value: PosContextType = {
     products,
     addProduct,
@@ -702,6 +787,12 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     processBarcodeCommand,
     cashClosures,
     addCashClosure,
+    heldOrders,
+    holdCurrentOrder,
+    resumeHeldOrder,
+    deleteHeldOrder,
+    searchHeldOrders,
+    validateAccessKey,
   };
 
   return <PosContext.Provider value={value}>{children}</PosContext.Provider>;

@@ -2,59 +2,36 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { HeldOrder } from '@/types/pos';
-import { Clock, ShoppingCart, User, Trash2, Play } from 'lucide-react';
+import { usePos } from '@/contexts/PosContext';
+import { Clock, ShoppingCart, User, Trash2, Play, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface HoldOrderManagerProps {
   open: boolean;
   onClose: () => void;
-  onResumeOrder: (order: HeldOrder) => void;
 }
 
 const HoldOrderManager: React.FC<HoldOrderManagerProps> = ({
   open,
-  onClose,
-  onResumeOrder
+  onClose
 }) => {
-  // Sample held orders - in real app this would come from context
-  const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([
-    {
-      id: 'HOLD-001',
-      items: [
-        { productId: '1', name: 'Café Premium', price: 350, quantity: 2, taxRate: 0.18 },
-        { productId: '2', name: 'Agua Mineral', price: 25, quantity: 1, taxRate: 0.18 }
-      ],
-      customerId: '1',
-      total: 725,
-      createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      createdBy: 'ADMIN',
-      note: 'Cliente esperando'
-    },
-    {
-      id: 'HOLD-002',
-      items: [
-        { productId: '3', name: 'Pan Tostado', price: 85, quantity: 3, taxRate: 0.18 }
-      ],
-      total: 255,
-      createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-      createdBy: 'ADMIN',
-      note: 'Revisar inventario'
-    }
-  ]);
+  const { heldOrders, resumeHeldOrder, deleteHeldOrder, searchHeldOrders } = usePos();
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const handleResumeOrder = (order: HeldOrder) => {
-    onResumeOrder(order);
-    setHeldOrders(prev => prev.filter(o => o.id !== order.id));
-    toast.success(`Pedido ${order.id} reanudado`);
+  const filteredOrders = searchTerm.trim() 
+    ? searchHeldOrders(searchTerm)
+    : heldOrders;
+
+  const handleResumeOrder = (orderId: string) => {
+    resumeHeldOrder(orderId);
     onClose();
   };
 
   const handleDeleteOrder = (orderId: string) => {
-    setHeldOrders(prev => prev.filter(o => o.id !== orderId));
-    toast.success('Pedido eliminado');
+    deleteHeldOrder(orderId);
   };
 
   const formatTime = (dateString: string) => {
@@ -76,20 +53,35 @@ const HoldOrderManager: React.FC<HoldOrderManagerProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Pedidos Abiertos ({heldOrders.length})
+            Pedidos Abiertos ({filteredOrders.length})
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          {heldOrders.length === 0 ? (
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Buscar por ID, nota o usuario..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {filteredOrders.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Clock className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium">No hay pedidos abiertos</p>
-              <p className="text-sm">Los pedidos guardados aparecerán aquí</p>
+              <p className="text-lg font-medium">
+                {searchTerm ? 'No se encontraron pedidos' : 'No hay pedidos abiertos'}
+              </p>
+              <p className="text-sm">
+                {searchTerm ? 'Intente con otros términos de búsqueda' : 'Los pedidos guardados aparecerán aquí'}
+              </p>
             </div>
           ) : (
             <div className="grid gap-4">
-              {heldOrders.map((order) => (
+              {filteredOrders.map((order) => (
                 <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -110,12 +102,15 @@ const HoldOrderManager: React.FC<HoldOrderManagerProps> = ({
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* Order Items */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
                       {order.items.map((item, index) => (
                         <div key={index} className="flex justify-between items-center text-sm bg-gray-50 p-2 rounded">
                           <div className="flex-1">
                             <span className="font-medium">{item.name}</span>
                             <span className="text-gray-500 ml-2">x{item.quantity}</span>
+                            {item.isWholesalePrice && (
+                              <Badge variant="secondary" className="text-xs ml-2">Mayoreo</Badge>
+                            )}
                           </div>
                           <span className="font-medium">
                             RD$ {(item.price * item.quantity).toLocaleString()}
@@ -151,7 +146,7 @@ const HoldOrderManager: React.FC<HoldOrderManagerProps> = ({
                     {/* Actions */}
                     <div className="flex gap-2 pt-2 border-t">
                       <Button
-                        onClick={() => handleResumeOrder(order)}
+                        onClick={() => handleResumeOrder(order.id)}
                         className="flex-1 bg-green-600 hover:bg-green-700"
                       >
                         <Play className="h-4 w-4 mr-2" />
