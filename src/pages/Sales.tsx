@@ -90,8 +90,6 @@ const Sales = () => {
             onCustomerChange={handleCustomerChange}
             useWholesalePrices={useWholesalePrices}
             onWholesalePriceChange={setUseWholesalePrices}
-            businessName={businessSettings?.name || 'Mi Negocio POS'}
-            currency={businessSettings?.currency || 'RD$'}
           />
 
           <PaymentModal 
