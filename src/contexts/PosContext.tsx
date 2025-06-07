@@ -4,6 +4,7 @@ import { useSettings } from './SettingsContext';
 import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote } from '@/types/pos';
 import { Supplier, Purchase, InventoryCount } from '@/types/inventory';
 import { User } from '@/types/auth';
+import { toast } from 'sonner';
 
 interface PosContextType {
   // Products
@@ -695,6 +696,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     inventoryCounts,
     addInventoryCount,
     updateInventoryCount,
+    currentUser,
     currentShift,
     setCurrentShift,
     processBarcodeCommand,

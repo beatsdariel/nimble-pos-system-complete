@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePos } from '@/contexts/PosContext';
 import { Button } from '@/components/ui/button';
 import CashClosureModal from '@/components/cash/CashClosureModal';
 import DayClosureModal from '@/components/cash/DayClosureModal';
@@ -22,6 +22,7 @@ import {
 const Sidebar = () => {
   const location = useLocation();
   const { currentUser, logout } = useAuth();
+  const { currentShift, addCashClosure } = usePos();
   const [showCashClosure, setShowCashClosure] = useState(false);
   const [showDayClosure, setShowDayClosure] = useState(false);
 
@@ -42,6 +43,14 @@ const Sidebar = () => {
   const handleLogout = () => {
     logout();
   };
+
+  const handleCashClosure = (closureData: any) => {
+    addCashClosure(closureData);
+    setShowCashClosure(false);
+  };
+
+  // Get opening amount from current shift or default to 0
+  const openingAmount = currentShift?.openingAmount || 0;
 
   return (
     <>
@@ -118,7 +127,9 @@ const Sidebar = () => {
 
       <CashClosureModal 
         open={showCashClosure} 
-        onClose={() => setShowCashClosure(false)} 
+        onClose={() => setShowCashClosure(false)}
+        onCloseCash={handleCashClosure}
+        openingAmount={openingAmount}
       />
       
       <DayClosureModal 
