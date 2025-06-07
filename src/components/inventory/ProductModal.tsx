@@ -114,6 +114,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
     }
   };
 
+  const showTaxRateField = formData.taxType === 'included' || formData.taxType === 'calculated';
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl">
@@ -254,7 +256,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
             </div>
           </div>
 
-          {formData.taxType !== 'exempt' && (
+          {showTaxRateField && (
             <div>
               <Label htmlFor="taxRate">Tasa de Impuesto (%)</Label>
               <Input
