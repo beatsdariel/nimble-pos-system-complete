@@ -9,19 +9,17 @@ import { usePos } from '@/contexts/PosContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Sales = () => {
-  const { cart, cartTotal, customers } = usePos();
+  const { cart, cartTotal, customers, currentShift, setCurrentShift } = usePos();
   const { currentUser } = useAuth();
   const [showPayment, setShowPayment] = useState(false);
   const [showSalesHistory, setShowSalesHistory] = useState(false);
-  const [showShiftSelection, setShowShiftSelection] = useState(true);
+  const [showShiftSelection, setShowShiftSelection] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('no-customer');
   const [useWholesalePrices, setUseWholesalePrices] = useState(false);
   const [returnData, setReturnData] = useState<{ returnAmount: number, returnId: string } | null>(null);
-  const [currentShift, setCurrentShift] = useState<{shiftId: string, openingAmount: number} | null>(null);
 
   // Check if user needs to select shift on component mount
   useEffect(() => {
-    // In a real app, this would check if there's an active shift
     setShowShiftSelection(!currentShift);
   }, [currentShift]);
 
@@ -59,7 +57,13 @@ const Sales = () => {
 
   // Handle shift start
   const handleStartShift = (shiftId: string, openingAmount: number) => {
-    setCurrentShift({ shiftId, openingAmount });
+    const shiftData = { 
+      shiftId, 
+      openingAmount, 
+      startTime: new Date().toISOString(),
+      status: 'open'
+    };
+    setCurrentShift(shiftData);
     setShowShiftSelection(false);
   };
 

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,8 @@ import CustomerSelector from './CustomerSelector';
 import HoldOrderManager from './HoldOrderManager';
 import QuickCustomerModal from './QuickCustomerModal';
 import CollectAccountModal from './CollectAccountModal';
-import { ShoppingCart, Trash2, User, Clock, Receipt, Minus, Plus, BarChart3, UserPlus, DollarSign, Search } from 'lucide-react';
+import CashClosureModal from '../cash/CashClosureModal';
+import { ShoppingCart, Trash2, User, Clock, Receipt, Minus, Plus, BarChart3, UserPlus, DollarSign, Search, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ModernPosInterfaceProps {
@@ -41,16 +42,30 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     customers,
     getCustomer,
     addToCart,
-    getProduct
+    getProduct,
+    currentShift,
+    processBarcodeCommand,
+    addCashClosure
   } = usePos();
 
   const [showHoldOrders, setShowHoldOrders] = useState(false);
   const [showQuickCustomer, setShowQuickCustomer] = useState(false);
   const [showCollectAccount, setShowCollectAccount] = useState(false);
+  const [showCashClosure, setShowCashClosure] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
 
   const selectedCustomerData = selectedCustomer && selectedCustomer !== 'no-customer' 
     ? getCustomer(selectedCustomer) 
     : null;
+
+  // Manejar entrada de código de barras y comandos
+  const handleBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (barcodeInput.trim()) {
+      processBarcodeCommand(barcodeInput.trim());
+      setBarcodeInput('');
+    }
+  };
 
   const handleQuantityChange = (productId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -82,38 +97,53 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     toast.success('Cliente creado y seleccionado');
   };
 
+  const handleCashClosure = (closureData: any) => {
+    addCashClosure(closureData);
+  };
+
   const currentDate = new Date().toLocaleDateString();
   const currentUser = "ADMIN";
   const registerNumber = "01";
-  const shiftNumber = "1";
+  const shiftNumber = currentShift?.shiftId || "1";
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
-      {/* Header with total */}
-      <div className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <div className="text-3xl font-bold">
-            $ {cartTotal.toFixed(2)}
+    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+      {/* Header Fijo */}
+      <div className="bg-white shadow-sm border-b px-6 py-3 flex-shrink-0">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-6">
+            <div className="text-2xl font-bold">
+              $ {cartTotal.toFixed(2)}
+            </div>
+            <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="Código/+cantidad (ej: +2)"
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                className="w-48"
+              />
+              <Button type="submit" size="sm">Agregar</Button>
+            </form>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            className="flex items-center gap-2"
-            onClick={() => {
-              // Hold order functionality
-              toast.info('Pedido guardado como abierto');
-            }}
-          >
-            <Clock className="h-4 w-4" />
-            DEJAR PEDIDO ABIERTO
-          </Button>
+          
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="flex items-center gap-2"
+              onClick={() => {
+                toast.info('Pedido guardado como abierto');
+              }}
+            >
+              <Clock className="h-4 w-4" />
+              DEJAR ABIERTO
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="bg-white px-6 py-4 border-b">
+      {/* Barra de Búsqueda Fija */}
+      <div className="bg-white px-6 py-3 border-b flex-shrink-0">
         <CentralProductSearch 
           useWholesalePrices={useWholesalePrices}
           onProductSelect={(product) => {
@@ -122,25 +152,25 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
         />
       </div>
 
-      {/* Main Content */}
+      {/* Contenido Principal - Layout Fijo */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Side - Cart */}
-        <div className="flex-1 flex flex-col">
-          {/* Cart Header */}
-          <div className="bg-yellow-400 px-6 py-3">
+        {/* Área del Carrito - Fija */}
+        <div className="flex-1 flex flex-col bg-white">
+          {/* Header del Carrito */}
+          <div className="bg-yellow-400 px-6 py-2 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" />
-                <span className="font-semibold text-lg">Carrito de Compras</span>
+                <span className="font-semibold">Carrito de Compras</span>
               </div>
-              <Badge variant="secondary" className="bg-black text-white px-3 py-1">
+              <Badge variant="secondary" className="bg-black text-white">
                 {cart.length} ítem(s)
               </Badge>
             </div>
           </div>
 
-          {/* Cart Table Headers */}
-          <div className="bg-gray-800 text-white px-6 py-3">
+          {/* Headers de Tabla */}
+          <div className="bg-gray-800 text-white px-6 py-2 flex-shrink-0">
             <div className="grid grid-cols-12 gap-4 text-sm font-medium">
               <div className="col-span-1">CANT.</div>
               <div className="col-span-6">DESCRIPCIÓN</div>
@@ -149,8 +179,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Cart Items */}
-          <div className="flex-1 bg-white overflow-y-auto">
+          {/* Lista de Productos - Scrollable */}
+          <div className="flex-1 overflow-y-auto">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400">
                 <ShoppingCart className="h-16 w-16 mb-4" />
@@ -161,8 +191,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               <div className="space-y-0">
                 {cart.map((item, index) => (
                   <div key={`${item.productId}-${item.isWholesalePrice}`} 
-                       className={`grid grid-cols-12 gap-4 px-6 py-4 border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                    {/* Quantity */}
+                       className={`grid grid-cols-12 gap-4 px-6 py-3 border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                    {/* Cantidad */}
                     <div className="col-span-1 flex items-center gap-1">
                       <Button
                         variant="outline"
@@ -189,7 +219,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                       </Button>
                     </div>
                     
-                    {/* Description */}
+                    {/* Descripción */}
                     <div className="col-span-6">
                       <div className="font-medium text-sm">{item.name}</div>
                       {item.isWholesalePrice && (
@@ -197,7 +227,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                       )}
                     </div>
                     
-                    {/* Price */}
+                    {/* Precio */}
                     <div className="col-span-2 text-sm">
                       RD$ {item.price.toLocaleString()}
                     </div>
@@ -222,8 +252,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             )}
           </div>
 
-          {/* Footer Info */}
-          <div className="bg-gray-200 px-6 py-3 border-t">
+          {/* Footer Info - Fijo */}
+          <div className="bg-gray-200 px-6 py-2 border-t flex-shrink-0">
             <div className="grid grid-cols-5 gap-4 text-sm">
               <div>
                 <span className="font-medium">Cliente: </span>
@@ -248,8 +278,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Total Section */}
-          <div className="bg-white px-6 py-4 border-t">
+          {/* Total Section - Fijo */}
+          <div className="bg-white px-6 py-3 border-t flex-shrink-0">
             <div className="flex justify-between items-center">
               <div className="text-sm">
                 <span className="font-medium">Total de Ítems: </span>
@@ -264,111 +294,123 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
           </div>
         </div>
 
-        {/* Right Side - Actions Panel */}
-        <div className="w-80 bg-white border-l flex flex-col">
+        {/* Panel Lateral de Acciones - Fijo */}
+        <div className="w-80 bg-white border-l flex flex-col flex-shrink-0">
           {/* Header */}
-          <div className="bg-blue-500 text-white px-4 py-3 text-center">
+          <div className="bg-blue-500 text-white px-4 py-3 text-center flex-shrink-0">
             <div className="flex items-center justify-center gap-2">
               <BarChart3 className="h-5 w-5" />
               <span className="font-semibold">Punto de Venta</span>
             </div>
           </div>
 
-          {/* Customer Management */}
-          <div className="p-4 border-b space-y-3">
-            <Button
-              variant="outline"
-              className="w-full flex items-center gap-2"
-              onClick={() => setShowQuickCustomer(true)}
-            >
-              <UserPlus className="h-4 w-4" />
-              AGREGAR CLIENTE
-            </Button>
-            
-            <CustomerSelector
-              selectedCustomer={selectedCustomer}
-              onCustomerChange={onCustomerChange}
-              customers={customers}
-            />
+          {/* Contenido Scrollable */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Customer Management */}
+            <div className="p-4 border-b space-y-3">
+              <Button
+                variant="outline"
+                className="w-full flex items-center gap-2"
+                onClick={() => setShowQuickCustomer(true)}
+              >
+                <UserPlus className="h-4 w-4" />
+                AGREGAR CLIENTE
+              </Button>
+              
+              <CustomerSelector
+                selectedCustomer={selectedCustomer}
+                onCustomerChange={onCustomerChange}
+                customers={customers}
+              />
+            </div>
+
+            {/* Order Management */}
+            <div className="p-4 border-b space-y-3">
+              <Button
+                variant="outline"
+                className="w-full flex items-center gap-2"
+                onClick={() => setShowHoldOrders(true)}
+              >
+                <Clock className="h-4 w-4" />
+                VER PEDIDOS ABIERTOS
+              </Button>
+              
+              <Button
+                variant="outline"
+                className="w-full flex items-center gap-2"
+                onClick={() => {
+                  toast.info('Módulo de buscar pedidos');
+                }}
+              >
+                <Search className="h-4 w-4" />
+                BUSCAR PEDIDOS
+              </Button>
+            </div>
+
+            {/* Account Management */}
+            <div className="p-4 border-b space-y-3">
+              <Button
+                variant="outline"
+                className="w-full bg-green-100 hover:bg-green-200 border-green-300"
+                onClick={() => setShowCollectAccount(true)}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                COBRAR CUENTAS
+              </Button>
+            </div>
+
+            {/* Cash Management */}
+            <div className="p-4 border-b space-y-3">
+              <Button
+                variant="outline"
+                className="w-full bg-purple-100 hover:bg-purple-200 border-purple-300"
+                onClick={() => setShowCashClosure(true)}
+              >
+                <Calculator className="h-4 w-4 mr-2" />
+                CUADRE DE CAJA
+              </Button>
+            </div>
+
+            {/* Sales History */}
+            <div className="p-4 border-b">
+              <Button
+                className="w-full flex items-center gap-2 bg-blue-500 hover:bg-blue-600"
+                onClick={onShowHistory}
+              >
+                <Receipt className="h-4 w-4" />
+                HISTORIAL DE VENTAS
+              </Button>
+            </div>
+
+            {/* Line Actions */}
+            <div className="p-4 border-b space-y-3">
+              <Button
+                variant="outline"
+                className="w-full bg-red-100 hover:bg-red-200 border-red-300"
+                onClick={() => {
+                  if (cart.length > 0) {
+                    const lastItem = cart[cart.length - 1];
+                    removeFromCart(lastItem.productId);
+                    toast.success('Última línea borrada');
+                  }
+                }}
+              >
+                🗑️ BORRAR LÍNEA
+              </Button>
+              
+              <Button
+                variant="outline"
+                className="w-full bg-red-100 hover:bg-red-200 border-red-300"
+                onClick={handleClearCart}
+              >
+                🧹 LIMPIAR TODO
+              </Button>
+            </div>
           </div>
 
-          {/* Order Management */}
-          <div className="p-4 border-b space-y-3">
-            <Button
-              variant="outline"
-              className="w-full flex items-center gap-2"
-              onClick={() => setShowHoldOrders(true)}
-            >
-              <Clock className="h-4 w-4" />
-              VER PEDIDOS ABIERTOS
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="w-full flex items-center gap-2"
-              onClick={() => {
-                toast.info('Módulo de buscar pedidos');
-              }}
-            >
-              <Search className="h-4 w-4" />
-              BUSCAR PEDIDOS
-            </Button>
-          </div>
-
-          {/* Account Management */}
-          <div className="p-4 border-b space-y-3">
-            <Button
-              variant="outline"
-              className="w-full bg-green-100 hover:bg-green-200 border-green-300"
-              onClick={() => setShowCollectAccount(true)}
-            >
-              <DollarSign className="h-4 w-4 mr-2" />
-              COBRAR CUENTAS
-            </Button>
-          </div>
-
-          {/* Sales History */}
-          <div className="p-4 border-b">
-            <Button
-              className="w-full flex items-center gap-2 bg-blue-500 hover:bg-blue-600"
-              onClick={onShowHistory}
-            >
-              <Receipt className="h-4 w-4" />
-              HISTORIAL DE VENTAS
-            </Button>
-          </div>
-
-          {/* Line Actions */}
-          <div className="p-4 border-b space-y-3">
-            <Button
-              variant="outline"
-              className="w-full bg-red-100 hover:bg-red-200 border-red-300"
-              onClick={() => {
-                if (cart.length > 0) {
-                  const lastItem = cart[cart.length - 1];
-                  removeFromCart(lastItem.productId);
-                  toast.success('Última línea borrada');
-                }
-              }}
-            >
-              🗑️ BORRAR LÍNEA
-            </Button>
-            
-            <Button
-              variant="outline"
-              className="w-full bg-red-100 hover:bg-red-200 border-red-300"
-              onClick={handleClearCart}
-            >
-              🧹 LIMPIAR TODO
-            </Button>
-          </div>
-
-          {/* Spacer */}
-          <div className="flex-1"></div>
-
-          {/* Checkout Button */}
+          {/* Checkout Button - Fijo */}
           {cart.length > 0 && (
-            <div className="p-4">
+            <div className="p-4 flex-shrink-0">
               <Button
                 onClick={onShowPayment}
                 className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700"
@@ -396,6 +438,13 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
       <CollectAccountModal
         open={showCollectAccount}
         onClose={() => setShowCollectAccount(false)}
+      />
+
+      <CashClosureModal
+        open={showCashClosure}
+        onClose={() => setShowCashClosure(false)}
+        onCloseCash={handleCashClosure}
+        openingAmount={currentShift?.openingAmount || 0}
       />
     </div>
   );

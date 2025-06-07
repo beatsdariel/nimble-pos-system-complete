@@ -68,6 +68,13 @@ interface PosContextType {
   
   // User
   currentUser: User | null;
+  
+  // Shift
+  currentShift: any;
+  setCurrentShift: (shift: any) => void;
+  processBarcodeCommand: (input: string) => void;
+  cashClosures: any[];
+  addCashClosure: (closure: any) => void;
 }
 
 const PosContext = createContext<PosContextType | undefined>(undefined);
@@ -85,6 +92,9 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [inventoryCounts, setInventoryCounts] = useState<InventoryCount[]>([]);
+  const [currentShift, setCurrentShift] = useState<any>(null);
+  const [cashClosures, setCashClosures] = useState<any[]>([]);
+  const [pendingQuantity, setPendingQuantity] = useState<number | null>(null);
 
   // Initialize with sample data
   useEffect(() => {
@@ -613,53 +623,86 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newSale;
   };
 
-  return (
-    <PosContext.Provider value={{
-      products,
-      addProduct,
-      updateProduct,
-      deleteProduct,
-      getProduct,
-      customers,
-      addCustomer,
-      updateCustomer,
-      getCustomer,
-      cart,
-      addToCart,
-      updateCartQuantity,
-      removeFromCart,
-      clearCart,
-      cartTotal,
-      cartSubtotal,
-      cartTax,
-      sales,
-      completeSale,
-      getSale,
-      processReturn,
-      returnedItems,
-      creditNotes,
-      createCreditNote,
-      getCustomerCreditNotes,
-      useCreditNote,
-      getCustomerCreditBalance,
-      getCreditSales,
-      updateCreditSale,
-      suppliers,
-      addSupplier,
-      updateSupplier,
-      getSupplier,
-      purchases,
-      addPurchase,
-      updatePurchase,
-      getPurchase,
-      inventoryCounts,
-      addInventoryCount,
-      updateInventoryCount,
-      currentUser
-    }}>
-      {children}
-    </PosContext.Provider>
-  );
+  const processBarcodeCommand = (input: string) => {
+    // Verificar si es un comando de cantidad (+2, +3, etc.)
+    const quantityMatch = input.match(/^\+(\d+)$/);
+    if (quantityMatch) {
+      const quantity = parseInt(quantityMatch[1]);
+      setPendingQuantity(quantity);
+      toast.success(`Cantidad ${quantity} establecida para el próximo producto`);
+      return;
+    }
+
+    // Buscar producto por código de barras
+    const product = products.find(p => p.barcode === input || p.sku === input);
+    if (product) {
+      const quantity = pendingQuantity || 1;
+      if (product.stock < quantity) {
+        toast.error(`Stock insuficiente. Disponible: ${product.stock}`);
+        return;
+      }
+      
+      addToCart(product, quantity);
+      toast.success(`${product.name} agregado (${quantity})`);
+      setPendingQuantity(null); // Resetear cantidad pendiente
+    } else {
+      toast.error('Producto no encontrado');
+    }
+  };
+
+  const addCashClosure = (closure: any) => {
+    setCashClosures(prev => [...prev, { ...closure, id: Date.now().toString() }]);
+  };
+
+  const value: PosContextType = {
+    products,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    getProduct,
+    customers,
+    addCustomer,
+    updateCustomer,
+    getCustomer,
+    cart,
+    addToCart,
+    updateCartQuantity,
+    removeFromCart,
+    clearCart,
+    cartTotal,
+    cartSubtotal,
+    cartTax,
+    sales,
+    completeSale,
+    getSale,
+    processReturn,
+    returnedItems,
+    creditNotes,
+    createCreditNote,
+    getCustomerCreditNotes,
+    useCreditNote,
+    getCustomerCreditBalance,
+    getCreditSales,
+    updateCreditSale,
+    suppliers,
+    addSupplier,
+    updateSupplier,
+    getSupplier,
+    purchases,
+    addPurchase,
+    updatePurchase,
+    getPurchase,
+    inventoryCounts,
+    addInventoryCount,
+    updateInventoryCount,
+    currentShift,
+    setCurrentShift,
+    processBarcodeCommand,
+    cashClosures,
+    addCashClosure,
+  };
+
+  return <PosContext.Provider value={value}>{children}</PosContext.Provider>;
 };
 
 export const usePos = () => {
