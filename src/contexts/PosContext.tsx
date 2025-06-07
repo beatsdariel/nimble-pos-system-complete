@@ -134,6 +134,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         minStock: 5,
         category: 'Bebidas',
         taxRate: 0.18,
+        taxType: 'calculated',
         image: '/placeholder.svg'
       },
       {
@@ -149,6 +150,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         minStock: 20,
         category: 'Bebidas',
         taxRate: 0.18,
+        taxType: 'calculated',
         image: '/placeholder.svg'
       },
       {
@@ -164,6 +166,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         minStock: 10,
         category: 'Panadería',
         taxRate: 0.18,
+        taxType: 'included',
         image: '/placeholder.svg'
       },
       {
@@ -179,21 +182,23 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         minStock: 15,
         category: 'Bebidas',
         taxRate: 0.18,
+        taxType: 'calculated',
         image: '/placeholder.svg'
       },
       {
         id: '5',
-        name: 'Galletas de Chocolate',
-        description: 'Paquete de galletas con chips de chocolate',
-        barcode: '7501234567894',
-        sku: 'GAL-001',
-        price: 120.00,
-        wholesalePrice: 105.00,
-        cost: 80.00,
-        stock: 30,
-        minStock: 8,
-        category: 'Snacks',
-        taxRate: 0.18,
+        name: 'Medicamento Genérico',
+        description: 'Medicamento exento de ITBIS',
+        barcode: '7501234567895',
+        sku: 'MED-001',
+        price: 150.00,
+        wholesalePrice: 135.00,
+        cost: 100.00,
+        stock: 20,
+        minStock: 5,
+        category: 'Medicina',
+        taxRate: 0,
+        taxType: 'exempt',
         image: '/placeholder.svg'
       }
     ];
@@ -281,7 +286,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return customers.find(c => c.id === id);
   };
 
-  // Cart functions
+  // Cart functions with improved tax calculation
   const addToCart = (product: Product, quantity: number, isWholesale: boolean = false) => {
     setCart(prev => {
       const price = isWholesale && product.wholesalePrice ? product.wholesalePrice : product.price;
@@ -321,7 +326,8 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         price,
         quantity,
         taxRate: product.taxRate,
-        isWholesalePrice: isWholesale
+        isWholesalePrice: isWholesale,
+        taxType: product.taxType || 'calculated'
       }];
     });
   };
@@ -351,10 +357,34 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCart([]);
   };
 
-  // Calculate cart totals
-  const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const cartTax = cart.reduce((sum, item) => sum + (item.price * item.quantity * item.taxRate), 0);
-  const cartTotal = cartSubtotal + cartTax;
+  // Calculate cart totals with improved tax calculation
+  const calculateCartTotals = () => {
+    let subtotal = 0;
+    let tax = 0;
+
+    cart.forEach(item => {
+      const itemSubtotal = item.price * item.quantity;
+      
+      if (item.taxType === 'included') {
+        // ITBIS incluido: separar el impuesto del precio
+        const itemTax = (itemSubtotal * item.taxRate) / (1 + item.taxRate);
+        subtotal += itemSubtotal - itemTax;
+        tax += itemTax;
+      } else if (item.taxType === 'calculated') {
+        // ITBIS calculado: añadir al precio
+        const itemTax = itemSubtotal * item.taxRate;
+        subtotal += itemSubtotal;
+        tax += itemTax;
+      } else {
+        // Sin ITBIS
+        subtotal += itemSubtotal;
+      }
+    });
+
+    return { subtotal, tax, total: subtotal + tax };
+  };
+
+  const { subtotal: cartSubtotal, tax: cartTax, total: cartTotal } = calculateCartTotals();
 
   // Get specific sale
   const getSale = (id: string) => {
@@ -457,7 +487,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return suppliers.find(s => s.id === id);
   };
 
-  // Purchase functions
+  // Purchase functions with enhanced tax handling
   const addPurchase = (purchase: Omit<Purchase, 'id' | 'userId'>) => {
     if (!currentUser) return;
     
@@ -484,14 +514,16 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     
-    // Update product costs and stock if purchase is received
+    // Update product costs, stock and tax type if purchase is received
     if (purchase.status === 'received') {
       purchase.items.forEach(item => {
         const product = getProduct(item.productId);
         if (product) {
           updateProduct(item.productId, {
             cost: item.unitCost,
-            stock: product.stock + item.quantity
+            stock: product.stock + item.quantity,
+            taxType: item.taxType || 'calculated',
+            taxRate: item.taxType === 'exempt' ? 0 : 0.18
           });
         }
       });
@@ -509,7 +541,9 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (product) {
               updateProduct(item.productId, {
                 cost: item.unitCost,
-                stock: product.stock + item.quantity
+                stock: product.stock + item.quantity,
+                taxType: item.taxType || 'calculated',
+                taxRate: item.taxType === 'exempt' ? 0 : 0.18
               });
             }
           });

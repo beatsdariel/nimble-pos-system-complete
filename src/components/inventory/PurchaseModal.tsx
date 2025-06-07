@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { usePos } from '@/contexts/PosContext';
 import { Purchase, PurchaseItem } from '@/types/inventory';
 import { toast } from 'sonner';
-import { Plus, Trash2, Receipt } from 'lucide-react';
+import { Plus, Trash2, Receipt, Calculator, Info } from 'lucide-react';
 
 interface PurchaseModalProps {
   open: boolean;
@@ -27,11 +27,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
     dueDate: '',
     status: 'pending' as 'pending' | 'received' | 'partial' | 'cancelled',
     notes: '',
-    // New fiscal fields
     fiscalReceipt: false,
     fiscalNumber: '',
     paymentType: 'cash' as 'cash' | 'credit',
-    invoiceNumber: ''
+    invoiceNumber: '',
+    taxCalculationType: 'calculated' as 'included' | 'calculated' | 'exempt'
   });
   const [items, setItems] = useState<PurchaseItem[]>([]);
 
@@ -44,10 +44,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
         dueDate: purchase.dueDate?.split('T')[0] || '',
         status: purchase.status,
         notes: purchase.notes || '',
-        fiscalReceipt: (purchase as any).fiscalReceipt || false,
-        fiscalNumber: (purchase as any).fiscalNumber || '',
-        paymentType: (purchase as any).paymentType || 'cash',
-        invoiceNumber: (purchase as any).invoiceNumber || ''
+        fiscalReceipt: purchase.fiscalReceipt || false,
+        fiscalNumber: purchase.fiscalNumber || '',
+        paymentType: purchase.paymentType || 'cash',
+        invoiceNumber: purchase.invoiceNumber || '',
+        taxCalculationType: purchase.taxCalculationType || 'calculated'
       });
       setItems(purchase.items);
     } else {
@@ -61,7 +62,8 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
         fiscalReceipt: false,
         fiscalNumber: '',
         paymentType: 'cash',
-        invoiceNumber: ''
+        invoiceNumber: '',
+        taxCalculationType: 'calculated'
       });
       setItems([]);
     }
@@ -73,8 +75,36 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
       productName: '',
       quantity: 1,
       unitCost: 0,
-      total: 0
+      total: 0,
+      taxType: formData.taxCalculationType,
+      taxAmount: 0
     }]);
+  };
+
+  const calculateTaxForItem = (unitCost: number, quantity: number, taxType: 'included' | 'calculated' | 'exempt') => {
+    const subtotal = unitCost * quantity;
+    let taxAmount = 0;
+    let total = subtotal;
+
+    switch (taxType) {
+      case 'included':
+        // ITBIS incluido en el precio
+        taxAmount = (subtotal * 0.18) / 1.18;
+        total = subtotal;
+        break;
+      case 'calculated':
+        // ITBIS calculado sobre el precio
+        taxAmount = subtotal * 0.18;
+        total = subtotal + taxAmount;
+        break;
+      case 'exempt':
+        // Sin ITBIS
+        taxAmount = 0;
+        total = subtotal;
+        break;
+    }
+
+    return { taxAmount, total };
   };
 
   const updateItem = (index: number, field: keyof PurchaseItem, value: any) => {
@@ -86,11 +116,18 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
       if (product) {
         updatedItems[index].productName = product.name;
         updatedItems[index].unitCost = product.cost;
+        updatedItems[index].taxType = formData.taxCalculationType;
       }
     }
     
-    if (field === 'quantity' || field === 'unitCost') {
-      updatedItems[index].total = updatedItems[index].quantity * updatedItems[index].unitCost;
+    if (field === 'quantity' || field === 'unitCost' || field === 'taxType') {
+      const { taxAmount, total } = calculateTaxForItem(
+        updatedItems[index].unitCost,
+        updatedItems[index].quantity,
+        updatedItems[index].taxType
+      );
+      updatedItems[index].taxAmount = taxAmount;
+      updatedItems[index].total = total;
     }
     
     setItems(updatedItems);
@@ -100,9 +137,21 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const tax = subtotal * 0.18;
-  const total = subtotal + tax;
+  const calculateTotals = () => {
+    const subtotal = items.reduce((sum, item) => {
+      if (item.taxType === 'included') {
+        return sum + (item.unitCost * item.quantity) - item.taxAmount;
+      }
+      return sum + (item.unitCost * item.quantity);
+    }, 0);
+    
+    const tax = items.reduce((sum, item) => sum + item.taxAmount, 0);
+    const total = items.reduce((sum, item) => sum + item.total, 0);
+    
+    return { subtotal, tax, total };
+  };
+
+  const { subtotal, tax, total } = calculateTotals();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,7 +167,6 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
       return;
     }
 
-    // Validate fiscal receipt fields
     if (formData.fiscalReceipt && !formData.fiscalNumber) {
       toast.error('Debe ingresar el número de comprobante fiscal');
       return;
@@ -137,11 +185,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
       total,
       paidAmount: formData.paymentType === 'cash' ? total : 0,
       notes: formData.notes || undefined,
-      // Add fiscal fields to purchase data
       fiscalReceipt: formData.fiscalReceipt,
       fiscalNumber: formData.fiscalNumber || undefined,
       paymentType: formData.paymentType,
-      invoiceNumber: formData.invoiceNumber || undefined
+      invoiceNumber: formData.invoiceNumber || undefined,
+      taxCalculationType: formData.taxCalculationType
     };
 
     if (purchase) {
@@ -155,9 +203,27 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
     onClose();
   };
 
+  const getTaxTypeLabel = (taxType: string) => {
+    switch (taxType) {
+      case 'included': return 'ITBIS Incluido';
+      case 'calculated': return 'ITBIS Calculado';
+      case 'exempt': return 'Exento de ITBIS';
+      default: return taxType;
+    }
+  };
+
+  const getTaxTypeBadgeVariant = (taxType: string) => {
+    switch (taxType) {
+      case 'included': return 'secondary';
+      case 'calculated': return 'default';
+      case 'exempt': return 'outline';
+      default: return 'default';
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5" />
@@ -193,7 +259,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
               <Label htmlFor="date">Fecha *</Label>
               <Input
@@ -227,7 +293,49 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="taxCalculationType">Cálculo de ITBIS *</Label>
+              <Select value={formData.taxCalculationType} onValueChange={(value: 'included' | 'calculated' | 'exempt') => {
+                setFormData(prev => ({ ...prev, taxCalculationType: value }));
+                // Actualizar todos los items con el nuevo tipo de impuesto
+                setItems(prev => prev.map(item => ({
+                  ...item,
+                  taxType: value,
+                  ...calculateTaxForItem(item.unitCost, item.quantity, value)
+                })));
+              }}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="calculated">ITBIS Calculado (18% adicional)</SelectItem>
+                  <SelectItem value="included">ITBIS Incluido (18% incluido en precio)</SelectItem>
+                  <SelectItem value="exempt">Sin ITBIS (Exento)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {/* Información del tipo de ITBIS */}
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Info className="h-4 w-4 text-blue-600" />
+                <span className="font-medium text-blue-800">Información del Cálculo de ITBIS</span>
+              </div>
+              <div className="text-sm text-blue-700">
+                {formData.taxCalculationType === 'calculated' && 
+                  "El ITBIS (18%) se calculará sobre el precio de costo y se añadirá al total."
+                }
+                {formData.taxCalculationType === 'included' && 
+                  "El ITBIS (18%) ya está incluido en el precio de costo. Se separará para efectos contables."
+                }
+                {formData.taxCalculationType === 'exempt' && 
+                  "Los productos están exentos de ITBIS. No se aplicará impuesto."
+                }
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Fiscal Receipt Section */}
           <Card>
@@ -296,7 +404,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
 
               <div className="space-y-3">
                 {items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-6 gap-2 items-end">
+                  <div key={index} className="grid grid-cols-8 gap-2 items-end p-3 border rounded-lg">
                     <div>
                       <Label>Producto</Label>
                       <Select value={item.productId} onValueChange={(value) => updateItem(index, 'productId', value)}>
@@ -331,6 +439,28 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
                       />
                     </div>
                     <div>
+                      <Label>Tipo ITBIS</Label>
+                      <Select value={item.taxType} onValueChange={(value: 'included' | 'calculated' | 'exempt') => updateItem(index, 'taxType', value)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="calculated">Calculado</SelectItem>
+                          <SelectItem value="included">Incluido</SelectItem>
+                          <SelectItem value="exempt">Exento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>ITBIS</Label>
+                      <Input
+                        type="number"
+                        value={item.taxAmount.toFixed(2)}
+                        readOnly
+                        className="bg-gray-100"
+                      />
+                    </div>
+                    <div>
                       <Label>Total</Label>
                       <Input
                         type="number"
@@ -338,6 +468,12 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
                         readOnly
                         className="bg-gray-100"
                       />
+                    </div>
+                    <div>
+                      <Label>Estado</Label>
+                      <Badge variant={getTaxTypeBadgeVariant(item.taxType) as any}>
+                        {getTaxTypeLabel(item.taxType)}
+                      </Badge>
                     </div>
                     <Button
                       type="button"
@@ -352,12 +488,30 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ open, onClose, purchase }
                 ))}
               </div>
 
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex justify-end space-y-1">
-                  <div className="text-right">
-                    <p>Subtotal: RD$ {subtotal.toFixed(2)}</p>
-                    <p>ITBIS (18%): RD$ {tax.toFixed(2)}</p>
-                    <p className="font-bold text-lg">Total: RD$ {total.toFixed(2)}</p>
+              <div className="mt-6 pt-4 border-t">
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-gray-700">Resumen por Tipo de ITBIS:</h4>
+                    {['calculated', 'included', 'exempt'].map(type => {
+                      const typeItems = items.filter(item => item.taxType === type);
+                      if (typeItems.length === 0) return null;
+                      
+                      const typeSubtotal = typeItems.reduce((sum, item) => sum + (item.unitCost * item.quantity), 0);
+                      const typeTax = typeItems.reduce((sum, item) => sum + item.taxAmount, 0);
+                      
+                      return (
+                        <div key={type} className="flex justify-between text-sm">
+                          <span>{getTaxTypeLabel(type)}:</span>
+                          <span>RD$ {typeSubtotal.toFixed(2)} (ITBIS: RD$ {typeTax.toFixed(2)})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="text-right space-y-1">
+                    <p className="text-lg">Subtotal: RD$ {subtotal.toFixed(2)}</p>
+                    <p className="text-lg">ITBIS Total: RD$ {tax.toFixed(2)}</p>
+                    <p className="font-bold text-xl border-t pt-1">Total: RD$ {total.toFixed(2)}</p>
                     {formData.paymentType === 'credit' && (
                       <p className="text-orange-600 font-medium">Pendiente de Pago</p>
                     )}

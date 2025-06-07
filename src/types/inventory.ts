@@ -1,3 +1,4 @@
+
 export interface Supplier {
   id: string;
   name: string;
@@ -31,6 +32,7 @@ export interface Purchase {
   fiscalNumber?: string;
   paymentType?: 'cash' | 'credit';
   invoiceNumber?: string;
+  taxCalculationType: 'included' | 'calculated' | 'exempt';
 }
 
 export interface PurchaseItem {
@@ -39,6 +41,8 @@ export interface PurchaseItem {
   quantity: number;
   unitCost: number;
   total: number;
+  taxType: 'included' | 'calculated' | 'exempt';
+  taxAmount: number;
 }
 
 export interface InventoryCount {

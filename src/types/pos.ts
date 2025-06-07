@@ -1,4 +1,3 @@
-
 export interface Product {
   id: string;
   name: string;
@@ -6,14 +5,15 @@ export interface Product {
   barcode: string;
   sku: string;
   price: number;
+  wholesalePrice?: number;
   cost: number;
   stock: number;
   minStock: number;
   category: string;
   taxRate: number;
+  taxType?: 'included' | 'calculated' | 'exempt';
   image?: string;
   supplier?: string;
-  wholesalePrice?: number;
 }
 
 export interface Customer {
@@ -36,8 +36,8 @@ export interface CartItem {
   price: number;
   quantity: number;
   taxRate: number;
-  discount?: number;
   isWholesalePrice?: boolean;
+  taxType?: 'included' | 'calculated' | 'exempt';
 }
 
 export interface PaymentMethod {
