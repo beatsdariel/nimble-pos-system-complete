@@ -86,7 +86,6 @@ const Sales = () => {
           <ModernPosInterface
             onShowPayment={handleCheckout}
             onShowHistory={() => setShowSalesHistory(true)}
-            onShowCashClosure={() => setShowCashClosure(true)}
             selectedCustomer={selectedCustomer}
             onCustomerChange={handleCustomerChange}
             useWholesalePrices={useWholesalePrices}

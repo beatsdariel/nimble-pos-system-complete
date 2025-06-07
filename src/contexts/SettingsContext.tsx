@@ -297,7 +297,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (account.id === accountId) {
         const newPaidAmount = account.paidAmount + payment.amount;
         const newRemainingAmount = account.amount - newPaidAmount;
-        const newStatus = newRemainingAmount <= 0 ? 'paid' : 
+        const newStatus: 'pending' | 'overdue' | 'paid' | 'partial' = newRemainingAmount <= 0 ? 'paid' : 
                          newPaidAmount > 0 ? 'partial' : 'pending';
 
         return {
@@ -358,7 +358,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (account.id === accountId) {
         const newPaidAmount = account.paidAmount + payment.amount;
         const newRemainingAmount = account.amount - newPaidAmount;
-        const newStatus = newRemainingAmount <= 0 ? 'paid' : 
+        const newStatus: 'pending' | 'overdue' | 'paid' | 'partial' = newRemainingAmount <= 0 ? 'paid' : 
                          newPaidAmount > 0 ? 'partial' : 'pending';
 
         return {
