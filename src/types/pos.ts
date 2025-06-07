@@ -155,3 +155,36 @@ export interface HeldOrder {
   createdBy: string;
   note?: string;
 }
+
+export interface InvoiceData {
+  type: 'sale' | 'credit-note' | 'return';
+  sale: Sale;
+  customer?: Customer;
+  returnData?: {
+    returnAmount: number;
+    returnId: string;
+    returnItems?: any[];
+    returnReason?: string;
+  };
+}
+
+export interface CashSessionSummary {
+  totalSales: number;
+  totalCash: number;
+  totalCard: number;
+  totalTransfer: number;
+  totalCredit: number;
+  openingAmount: number;
+  netCashSales: number; // Sales without opening amount
+  actualAmounts: {
+    cash: number;
+    card: number;
+    transfer: number;
+  };
+  differences: {
+    cash: number;
+    card: number;
+    transfer: number;
+    total: number;
+  };
+}

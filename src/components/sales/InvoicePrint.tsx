@@ -1,18 +1,36 @@
 
 import React from 'react';
 import { Sale, Customer } from '@/types/pos';
+import { useSettings } from '@/contexts/SettingsContext';
 import { toast } from 'sonner';
 
 interface InvoicePrintProps {
   sale: Sale;
   customer?: Customer;
   onPrint: () => void;
+  type?: 'sale' | 'credit-note' | 'return';
+  returnData?: {
+    returnAmount: number;
+    returnId: string;
+    returnItems?: any[];
+    returnReason?: string;
+  };
 }
 
-const InvoicePrint: React.FC<InvoicePrintProps> = ({ sale, customer, onPrint }) => {
+const InvoicePrint: React.FC<InvoicePrintProps> = ({ 
+  sale, 
+  customer, 
+  onPrint, 
+  type = 'sale',
+  returnData 
+}) => {
+  const { businessSettings } = useSettings();
   
   const printInvoice = () => {
-    console.log('Imprimiendo factura:', {
+    const documentType = type === 'credit-note' ? 'NOTA DE CRÉDITO' :
+                        type === 'return' ? 'FACTURA DE DEVOLUCIÓN' : 'FACTURA DE VENTA';
+    
+    console.log(`Imprimiendo ${documentType.toLowerCase()}:`, {
       saleId: sale.id,
       receiptNumber: sale.receiptNumber,
       date: sale.date,
@@ -30,78 +48,230 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ sale, customer, onPrint }) 
       subtotal: sale.subtotal,
       tax: sale.tax,
       total: sale.total,
-      payments: sale.payments.map(payment => ({
-        type: payment.type,
-        amount: payment.amount,
-        reference: payment.reference || `AUTO-${Date.now()}`
-      })),
-      status: sale.status
+      type,
+      returnData
     });
 
-    // Simular impresión
+    // Calcular ITBIS correctamente (incluido en el precio)
+    const taxRate = businessSettings?.taxRate || 18;
+    const itemsWithTax = sale.items.map(item => {
+      const totalAmount = item.price * item.quantity;
+      // El ITBIS está incluido en el precio, calculamos el valor sin impuesto
+      const basePrice = totalAmount / (1 + (taxRate / 100));
+      const taxAmount = totalAmount - basePrice;
+      
+      return {
+        ...item,
+        basePrice: basePrice / item.quantity,
+        basePriceTotal: basePrice,
+        taxAmount: taxAmount,
+        totalWithTax: totalAmount
+      };
+    });
+
+    const subtotalBase = itemsWithTax.reduce((sum, item) => sum + item.basePriceTotal, 0);
+    const totalTax = itemsWithTax.reduce((sum, item) => sum + item.taxAmount, 0);
+    const grandTotal = subtotalBase + totalTax;
+
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
         <html>
         <head>
-          <title>Factura ${sale.receiptNumber}</title>
+          <title>${documentType} ${sale.receiptNumber}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .company-name { font-size: 24px; font-weight: bold; }
-            .invoice-info { margin-bottom: 20px; }
-            .customer-info { margin-bottom: 20px; }
-            .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            .items-table th, .items-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            .items-table th { background-color: #f2f2f2; }
-            .totals { text-align: right; }
-            .total-line { display: flex; justify-content: space-between; margin: 5px 0; }
-            .final-total { font-weight: bold; font-size: 18px; }
-            .payments { margin-top: 20px; }
-            .footer { margin-top: 30px; text-align: center; font-size: 12px; }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 20px; 
+              font-size: 12px;
+              line-height: 1.4;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              border-bottom: 2px solid #333;
+              padding-bottom: 15px;
+            }
+            .company-name { 
+              font-size: 20px; 
+              font-weight: bold; 
+              margin-bottom: 5px;
+            }
+            .company-info { 
+              font-size: 11px; 
+              color: #666;
+            }
+            .document-title {
+              font-size: 18px;
+              font-weight: bold;
+              text-align: center;
+              margin: 20px 0;
+              padding: 10px;
+              border: 2px solid #333;
+              background-color: #f5f5f5;
+            }
+            .invoice-info { 
+              margin-bottom: 20px; 
+              display: flex;
+              justify-content: space-between;
+            }
+            .invoice-info div {
+              flex: 1;
+            }
+            .customer-info { 
+              margin-bottom: 20px; 
+              border: 1px solid #ddd;
+              padding: 10px;
+              background-color: #f9f9f9;
+            }
+            .items-table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 20px; 
+            }
+            .items-table th, .items-table td { 
+              border: 1px solid #ddd; 
+              padding: 6px; 
+              text-align: left; 
+              font-size: 11px;
+            }
+            .items-table th { 
+              background-color: #333; 
+              color: white;
+              font-weight: bold;
+            }
+            .items-table td.number { 
+              text-align: right; 
+            }
+            .totals { 
+              margin-left: auto;
+              width: 300px;
+              border: 1px solid #333;
+              padding: 10px;
+            }
+            .total-line { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 5px 0; 
+              padding: 2px 0;
+            }
+            .final-total { 
+              font-weight: bold; 
+              font-size: 14px; 
+              border-top: 2px solid #333;
+              padding-top: 5px;
+              margin-top: 10px;
+            }
+            .payments { 
+              margin-top: 20px; 
+              border: 1px solid #ddd;
+              padding: 10px;
+            }
+            .footer { 
+              margin-top: 30px; 
+              text-align: center; 
+              font-size: 10px; 
+              border-top: 1px solid #ddd;
+              padding-top: 15px;
+            }
+            .credit-note-info {
+              background-color: #fff3cd;
+              border: 2px solid #ffc107;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 5px;
+            }
+            .return-info {
+              background-color: #f8d7da;
+              border: 2px solid #dc3545;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 5px;
+            }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
           </style>
         </head>
         <body>
           <div class="header">
-            <div class="company-name">TU EMPRESA</div>
-            <div>RNC: 123-45678-9</div>
-            <div>Teléfono: (809) 555-0123</div>
-            <div>Dirección: Calle Principal #123, Santo Domingo</div>
+            <div class="company-name">${businessSettings?.name || 'MI EMPRESA'}</div>
+            <div class="company-info">
+              ${businessSettings?.rnc ? `RNC: ${businessSettings.rnc}` : ''}<br>
+              ${businessSettings?.address || ''}<br>
+              ${businessSettings?.phone ? `Tel: ${businessSettings.phone}` : ''}<br>
+              ${businessSettings?.email || ''}
+            </div>
           </div>
+
+          <div class="document-title">${documentType}</div>
 
           <div class="invoice-info">
-            <strong>FACTURA DE VENTA</strong><br>
-            Número: ${sale.receiptNumber}<br>
-            Fecha: ${new Date(sale.date).toLocaleString()}<br>
-            Estado: ${sale.status === 'completed' ? 'Completada' : sale.status === 'credit' ? 'A Crédito' : sale.status}
+            <div>
+              <strong>Número:</strong> ${sale.receiptNumber}<br>
+              <strong>Fecha:</strong> ${new Date(sale.date).toLocaleDateString()}<br>
+              <strong>Hora:</strong> ${new Date(sale.date).toLocaleTimeString()}
+            </div>
+            <div>
+              <strong>Estado:</strong> ${
+                sale.status === 'completed' ? 'Completada' : 
+                sale.status === 'credit' ? 'A Crédito' : 
+                sale.status === 'returned' ? 'Devuelta' :
+                sale.status
+              }<br>
+              ${type === 'credit-note' ? '<strong>Tipo:</strong> Nota de Crédito' : ''}
+              ${type === 'return' ? '<strong>Tipo:</strong> Devolución' : ''}
+            </div>
           </div>
 
+          ${type === 'credit-note' ? `
+            <div class="credit-note-info">
+              <strong>⚠️ NOTA DE CRÉDITO</strong><br>
+              Monto del crédito: ${businessSettings?.currency || 'RD$'} ${returnData?.returnAmount?.toLocaleString() || '0.00'}<br>
+              ${returnData?.returnReason ? `Motivo: ${returnData.returnReason}` : ''}
+            </div>
+          ` : ''}
+
+          ${type === 'return' ? `
+            <div class="return-info">
+              <strong>📦 DEVOLUCIÓN</strong><br>
+              Monto de devolución: ${businessSettings?.currency || 'RD$'} ${returnData?.returnAmount?.toLocaleString() || '0.00'}<br>
+              Factura original: ${sale.receiptNumber}<br>
+              ${returnData?.returnReason ? `Motivo: ${returnData.returnReason}` : ''}
+            </div>
+          ` : ''}
+
           <div class="customer-info">
-            <strong>CLIENTE:</strong><br>
+            <strong>DATOS DEL CLIENTE:</strong><br>
             ${customer ? `
-              Nombre: ${customer.name}<br>
-              ${customer.document ? `Documento: ${customer.document}<br>` : ''}
-              ${customer.address ? `Dirección: ${customer.address}<br>` : ''}
-              ${customer.phone ? `Teléfono: ${customer.phone}<br>` : ''}
-            ` : 'Cliente General'}
+              <strong>Nombre:</strong> ${customer.name}<br>
+              ${customer.document ? `<strong>Documento:</strong> ${customer.document}<br>` : ''}
+              ${customer.address ? `<strong>Dirección:</strong> ${customer.address}<br>` : ''}
+              ${customer.phone ? `<strong>Teléfono:</strong> ${customer.phone}<br>` : ''}
+            ` : '<strong>Nombre:</strong> CONSUMIDOR FINAL'}
           </div>
 
           <table class="items-table">
             <thead>
               <tr>
-                <th>Producto</th>
-                <th>Cantidad</th>
-                <th>Precio Unit.</th>
-                <th>Total</th>
+                <th style="width: 40%">Descripción</th>
+                <th style="width: 10%">Cant.</th>
+                <th style="width: 15%">Precio Base</th>
+                <th style="width: 15%">Valor Base</th>
+                <th style="width: 10%">ITBIS</th>
+                <th style="width: 15%">Total</th>
               </tr>
             </thead>
             <tbody>
-              ${sale.items.map(item => `
+              ${itemsWithTax.map(item => `
                 <tr>
                   <td>${item.name}</td>
-                  <td>${item.quantity}</td>
-                  <td>RD$ ${item.price.toLocaleString()}</td>
-                  <td>RD$ ${(item.price * item.quantity).toLocaleString()}</td>
+                  <td class="number">${item.quantity}</td>
+                  <td class="number">${businessSettings?.currency || 'RD$'} ${item.basePrice.toFixed(2)}</td>
+                  <td class="number">${businessSettings?.currency || 'RD$'} ${item.basePriceTotal.toFixed(2)}</td>
+                  <td class="number">${businessSettings?.currency || 'RD$'} ${item.taxAmount.toFixed(2)}</td>
+                  <td class="number">${businessSettings?.currency || 'RD$'} ${item.totalWithTax.toLocaleString()}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -109,16 +279,16 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ sale, customer, onPrint }) 
 
           <div class="totals">
             <div class="total-line">
-              <span>Subtotal:</span>
-              <span>RD$ ${sale.subtotal.toLocaleString()}</span>
+              <span>Subtotal (Base):</span>
+              <span>${businessSettings?.currency || 'RD$'} ${subtotalBase.toFixed(2)}</span>
             </div>
             <div class="total-line">
-              <span>ITBIS (18%):</span>
-              <span>RD$ ${sale.tax.toLocaleString()}</span>
+              <span>ITBIS (${taxRate}%):</span>
+              <span>${businessSettings?.currency || 'RD$'} ${totalTax.toFixed(2)}</span>
             </div>
             <div class="total-line final-total">
               <span>TOTAL:</span>
-              <span>RD$ ${sale.total.toLocaleString()}</span>
+              <span>${businessSettings?.currency || 'RD$'} ${grandTotal.toLocaleString()}</span>
             </div>
           </div>
 
@@ -129,22 +299,26 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ sale, customer, onPrint }) 
                                payment.type === 'card' ? 'Tarjeta' : 
                                payment.type === 'transfer' ? 'Transferencia' : 
                                payment.type === 'credit' ? 'Crédito' : 
+                               payment.type === 'return' ? 'Devolución' :
+                               payment.type === 'credit-note' ? 'Nota de Crédito' :
                                payment.type;
               const reference = payment.reference ? ` (Ref: ${payment.reference})` : '';
-              return `${paymentType}: RD$ ${payment.amount.toLocaleString()}${reference}<br>`;
+              return `• ${paymentType}: ${businessSettings?.currency || 'RD$'} ${payment.amount.toLocaleString()}${reference}<br>`;
             }).join('')}
           </div>
 
           ${sale.dueDate ? `
             <div style="margin-top: 20px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba;">
-              <strong>VENTA A CRÉDITO</strong><br>
+              <strong>⏰ VENTA A CRÉDITO</strong><br>
               Fecha de vencimiento: ${new Date(sale.dueDate).toLocaleDateString()}
             </div>
           ` : ''}
 
           <div class="footer">
-            <p>¡Gracias por su compra!</p>
+            <p><strong>${businessSettings?.name || 'MI EMPRESA'}</strong></p>
             <p>Esta factura es válida como comprobante de compra</p>
+            <p>Impreso el: ${new Date().toLocaleString()}</p>
+            ${businessSettings?.rnc ? `<p>RNC: ${businessSettings.rnc}</p>` : ''}
           </div>
         </body>
         </html>
@@ -156,7 +330,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ sale, customer, onPrint }) 
       printWindow.close();
     }
 
-    toast.success('Factura enviada a impresión');
+    toast.success(`${documentType} enviada a impresión`);
     onPrint();
   };
 
@@ -169,7 +343,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ sale, customer, onPrint }) 
     return () => clearTimeout(timer);
   }, []);
 
-  return null; // This component doesn't render anything visible
+  return null;
 };
 
 export default InvoicePrint;
