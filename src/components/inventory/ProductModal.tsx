@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { usePos } from '@/contexts/PosContext';
 import { Product } from '@/types/pos';
 import { toast } from 'sonner';
@@ -31,7 +32,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
     minStock: '',
     category: '',
     taxRate: '0.18',
-    taxType: 'calculated' as 'included' | 'calculated' | 'exempt'
+    taxType: 'calculated' as 'included' | 'calculated' | 'exempt',
+    isFractional: false,
+    unitOfMeasure: 'unidad' as 'caja' | 'paquete' | 'libra' | 'unidad' | 'metro' | 'kilogramo',
+    fractionalUnit: ''
   });
 
   useEffect(() => {
@@ -48,7 +52,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
         minStock: product.minStock.toString(),
         category: product.category,
         taxRate: product.taxRate.toString(),
-        taxType: product.taxType || 'calculated'
+        taxType: product.taxType || 'calculated',
+        isFractional: product.isFractional || false,
+        unitOfMeasure: product.unitOfMeasure || 'unidad',
+        fractionalUnit: product.fractionalUnit || ''
       });
     } else {
       setFormData({
@@ -63,7 +70,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
         minStock: '',
         category: '',
         taxRate: '0.18',
-        taxType: 'calculated'
+        taxType: 'calculated',
+        isFractional: false,
+        unitOfMeasure: 'unidad',
+        fractionalUnit: ''
       });
     }
   }, [product, open]);
@@ -83,7 +93,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
       minStock: parseInt(formData.minStock),
       category: formData.category,
       taxRate: formData.taxType === 'exempt' ? 0 : parseFloat(formData.taxRate),
-      taxType: formData.taxType
+      taxType: formData.taxType,
+      isFractional: formData.isFractional,
+      unitOfMeasure: formData.unitOfMeasure,
+      fractionalUnit: formData.isFractional ? formData.fractionalUnit : undefined
     };
 
     if (product) {
@@ -97,7 +110,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
     onClose();
   };
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -118,7 +131,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
@@ -126,7 +139,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="name">Nombre del Producto *</Label>
@@ -178,6 +191,51 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
             </div>
           </div>
 
+          {/* Unidad de Medida y Fracciones */}
+          <div className="border rounded-lg p-4 space-y-4">
+            <h3 className="font-medium">Configuración de Medidas</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="unitOfMeasure">Unidad de Medida *</Label>
+                <Select value={formData.unitOfMeasure} onValueChange={(value: any) => handleChange('unitOfMeasure', value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unidad">Unidad</SelectItem>
+                    <SelectItem value="caja">Caja</SelectItem>
+                    <SelectItem value="paquete">Paquete</SelectItem>
+                    <SelectItem value="libra">Libra</SelectItem>
+                    <SelectItem value="kilogramo">Kilogramo</SelectItem>
+                    <SelectItem value="metro">Metro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center space-x-2 pt-6">
+                <Switch
+                  id="isFractional"
+                  checked={formData.isFractional}
+                  onCheckedChange={(checked) => handleChange('isFractional', checked)}
+                />
+                <Label htmlFor="isFractional">Artículo Fraccional</Label>
+              </div>
+            </div>
+
+            {formData.isFractional && (
+              <div>
+                <Label htmlFor="fractionalUnit">Unidad Fraccional</Label>
+                <Input
+                  id="fractionalUnit"
+                  value={formData.fractionalUnit}
+                  onChange={(e) => handleChange('fractionalUnit', e.target.value)}
+                  placeholder="ej: gramos, mililitros, centímetros"
+                />
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="cost">Precio de Costo *</Label>
@@ -219,6 +277,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
               <Input
                 id="stock"
                 type="number"
+                step={formData.isFractional ? "0.01" : "1"}
                 value={formData.stock}
                 onChange={(e) => handleChange('stock', e.target.value)}
                 required
@@ -229,6 +288,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ open, onClose, product }) =
               <Input
                 id="minStock"
                 type="number"
+                step={formData.isFractional ? "0.01" : "1"}
                 value={formData.minStock}
                 onChange={(e) => handleChange('minStock', e.target.value)}
                 required

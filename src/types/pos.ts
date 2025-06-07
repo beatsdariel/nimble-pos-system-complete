@@ -14,6 +14,9 @@ export interface Product {
   taxType?: 'included' | 'calculated' | 'exempt';
   image?: string;
   supplier?: string;
+  isFractional?: boolean;
+  unitOfMeasure?: 'caja' | 'paquete' | 'libra' | 'unidad' | 'metro' | 'kilogramo';
+  fractionalUnit?: string;
 }
 
 export interface Customer {
@@ -126,7 +129,21 @@ export interface CashSession {
   totalSales: number;
   totalCash: number;
   totalCard: number;
+  totalTransfer: number;
   totalCredit: number;
+  actualCash?: number;
+  actualCard?: number;
+  actualTransfer?: number;
+  cashDifference?: number;
+  cardDifference?: number;
+  transferDifference?: number;
+}
+
+export interface CashCount {
+  cash: number;
+  card: number;
+  transfer: number;
+  notes?: string;
 }
 
 export interface HeldOrder {

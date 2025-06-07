@@ -50,7 +50,20 @@ interface SettingsContextType {
   createBackup: () => void;
   restoreBackup: (file: File) => void;
   clearSalesData: () => void;
+  
+  // Settings persistence
+  saveSettingsToStorage: () => void;
+  loadSettingsFromStorage: () => void;
 }
+
+const STORAGE_KEYS = {
+  BUSINESS: 'business_settings',
+  RECEIPT: 'receipt_settings',
+  SYSTEM: 'system_settings',
+  USERS: 'system_users',
+  ACCOUNTS_RECEIVABLE: 'accounts_receivable',
+  ACCOUNTS_PAYABLE: 'accounts_payable'
+};
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
@@ -109,34 +122,101 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [accountsReceivable, setAccountsReceivable] = useState<AccountsReceivable[]>([]);
   const [accountsPayable, setAccountsPayable] = useState<AccountsPayable[]>([]);
 
+  // Load settings from localStorage on component mount
+  useEffect(() => {
+    loadSettingsFromStorage();
+  }, []);
+
+  // Save to localStorage
+  const saveSettingsToStorage = () => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.BUSINESS, JSON.stringify(businessSettings));
+      localStorage.setItem(STORAGE_KEYS.RECEIPT, JSON.stringify(receiptSettings));
+      localStorage.setItem(STORAGE_KEYS.SYSTEM, JSON.stringify(systemSettings));
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(systemUsers));
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_RECEIVABLE, JSON.stringify(accountsReceivable));
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_PAYABLE, JSON.stringify(accountsPayable));
+      console.log('Configuraciones guardadas en localStorage');
+    } catch (error) {
+      console.error('Error guardando configuraciones:', error);
+    }
+  };
+
+  // Load from localStorage
+  const loadSettingsFromStorage = () => {
+    try {
+      const business = localStorage.getItem(STORAGE_KEYS.BUSINESS);
+      const receipt = localStorage.getItem(STORAGE_KEYS.RECEIPT);
+      const system = localStorage.getItem(STORAGE_KEYS.SYSTEM);
+      const users = localStorage.getItem(STORAGE_KEYS.USERS);
+      const receivable = localStorage.getItem(STORAGE_KEYS.ACCOUNTS_RECEIVABLE);
+      const payable = localStorage.getItem(STORAGE_KEYS.ACCOUNTS_PAYABLE);
+
+      if (business) setBusinessSettings(JSON.parse(business));
+      if (receipt) setReceiptSettings(JSON.parse(receipt));
+      if (system) setSystemSettings(JSON.parse(system));
+      if (users) setSystemUsers(JSON.parse(users));
+      if (receivable) setAccountsReceivable(JSON.parse(receivable));
+      if (payable) setAccountsPayable(JSON.parse(payable));
+      
+      console.log('Configuraciones cargadas desde localStorage');
+    } catch (error) {
+      console.error('Error cargando configuraciones:', error);
+    }
+  };
+
   // Business Settings
   const updateBusinessSettings = (settings: Partial<BusinessSettings>) => {
-    setBusinessSettings(prev => prev ? {
-      ...prev,
+    const updatedSettings = businessSettings ? {
+      ...businessSettings,
       ...settings,
       updatedAt: new Date().toISOString()
-    } : prev);
-    toast.success('Configuración del negocio actualizada');
+    } : null;
+    
+    if (updatedSettings) {
+      setBusinessSettings(updatedSettings);
+      // Automatically save to localStorage
+      setTimeout(() => {
+        localStorage.setItem(STORAGE_KEYS.BUSINESS, JSON.stringify(updatedSettings));
+      }, 100);
+      toast.success('Configuración del negocio actualizada');
+    }
   };
 
   // Receipt Settings
   const updateReceiptSettings = (settings: Partial<ReceiptSettings>) => {
-    setReceiptSettings(prev => prev ? {
-      ...prev,
+    const updatedSettings = receiptSettings ? {
+      ...receiptSettings,
       ...settings,
       updatedAt: new Date().toISOString()
-    } : prev);
-    toast.success('Configuración de recibos actualizada');
+    } : null;
+    
+    if (updatedSettings) {
+      setReceiptSettings(updatedSettings);
+      // Automatically save to localStorage
+      setTimeout(() => {
+        localStorage.setItem(STORAGE_KEYS.RECEIPT, JSON.stringify(updatedSettings));
+      }, 100);
+      toast.success('Configuración de recibos actualizada');
+    }
   };
 
   // System Settings
   const updateSystemSettings = (settings: Partial<SystemSettings>) => {
-    setSystemSettings(prev => prev ? {
-      ...prev,
+    const updatedSettings = systemSettings ? {
+      ...systemSettings,
       ...settings,
       updatedAt: new Date().toISOString()
-    } : prev);
-    toast.success('Configuración del sistema actualizada');
+    } : null;
+    
+    if (updatedSettings) {
+      setSystemSettings(updatedSettings);
+      // Automatically save to localStorage
+      setTimeout(() => {
+        localStorage.setItem(STORAGE_KEYS.SYSTEM, JSON.stringify(updatedSettings));
+      }, 100);
+      toast.success('Configuración del sistema actualizada');
+    }
   };
 
   // User Management
@@ -146,19 +226,34 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       id: Date.now().toString(),
       createdAt: new Date().toISOString()
     };
-    setSystemUsers(prev => [...prev, newUser]);
+    const updatedUsers = [...systemUsers, newUser];
+    setSystemUsers(updatedUsers);
+    // Automatically save to localStorage
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
+    }, 100);
     toast.success('Usuario agregado exitosamente');
   };
 
   const updateUser = (id: string, updates: Partial<SystemUser>) => {
-    setSystemUsers(prev => prev.map(user => 
+    const updatedUsers = systemUsers.map(user => 
       user.id === id ? { ...user, ...updates } : user
-    ));
+    );
+    setSystemUsers(updatedUsers);
+    // Automatically save to localStorage
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
+    }, 100);
     toast.success('Usuario actualizado');
   };
 
   const deleteUser = (id: string) => {
-    setSystemUsers(prev => prev.filter(user => user.id !== id));
+    const updatedUsers = systemUsers.filter(user => user.id !== id);
+    setSystemUsers(updatedUsers);
+    // Automatically save to localStorage
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
+    }, 100);
     toast.success('Usuario eliminado');
   };
 
@@ -170,14 +265,22 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       createdAt: new Date().toISOString(),
       paymentHistory: []
     };
-    setAccountsReceivable(prev => [...prev, newAccount]);
+    const updatedAccounts = [...accountsReceivable, newAccount];
+    setAccountsReceivable(updatedAccounts);
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_RECEIVABLE, JSON.stringify(updatedAccounts));
+    }, 100);
     toast.success('Cuenta por cobrar agregada');
   };
 
   const updateAccountReceivable = (id: string, updates: Partial<AccountsReceivable>) => {
-    setAccountsReceivable(prev => prev.map(account =>
+    const updatedAccounts = accountsReceivable.map(account =>
       account.id === id ? { ...account, ...updates } : account
-    ));
+    );
+    setAccountsReceivable(updatedAccounts);
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_RECEIVABLE, JSON.stringify(updatedAccounts));
+    }, 100);
     toast.success('Cuenta por cobrar actualizada');
   };
 
@@ -190,7 +293,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       userId: currentUser.id
     };
 
-    setAccountsReceivable(prev => prev.map(account => {
+    const updatedAccounts = accountsReceivable.map(account => {
       if (account.id === accountId) {
         const newPaidAmount = account.paidAmount + payment.amount;
         const newRemainingAmount = account.amount - newPaidAmount;
@@ -206,8 +309,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         };
       }
       return account;
-    }));
+    });
 
+    setAccountsReceivable(updatedAccounts);
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_RECEIVABLE, JSON.stringify(updatedAccounts));
+    }, 100);
     toast.success('Pago registrado exitosamente');
   };
 
@@ -219,14 +326,22 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       createdAt: new Date().toISOString(),
       paymentHistory: []
     };
-    setAccountsPayable(prev => [...prev, newAccount]);
+    const updatedAccounts = [...accountsPayable, newAccount];
+    setAccountsPayable(updatedAccounts);
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_PAYABLE, JSON.stringify(updatedAccounts));
+    }, 100);
     toast.success('Cuenta por pagar agregada');
   };
 
   const updateAccountPayable = (id: string, updates: Partial<AccountsPayable>) => {
-    setAccountsPayable(prev => prev.map(account =>
+    const updatedAccounts = accountsPayable.map(account =>
       account.id === id ? { ...account, ...updates } : account
-    ));
+    );
+    setAccountsPayable(updatedAccounts);
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_PAYABLE, JSON.stringify(updatedAccounts));
+    }, 100);
     toast.success('Cuenta por pagar actualizada');
   };
 
@@ -239,7 +354,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       userId: currentUser.id
     };
 
-    setAccountsPayable(prev => prev.map(account => {
+    const updatedAccounts = accountsPayable.map(account => {
       if (account.id === accountId) {
         const newPaidAmount = account.paidAmount + payment.amount;
         const newRemainingAmount = account.amount - newPaidAmount;
@@ -255,8 +370,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         };
       }
       return account;
-    }));
+    });
 
+    setAccountsPayable(updatedAccounts);
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_PAYABLE, JSON.stringify(updatedAccounts));
+    }, 100);
     toast.success('Pago registrado exitosamente');
   };
 
@@ -278,7 +397,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       saleId
     };
     
-    setAccountsReceivable(prev => [...prev, newAccount]);
+    const updatedAccounts = [...accountsReceivable, newAccount];
+    setAccountsReceivable(updatedAccounts);
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_RECEIVABLE, JSON.stringify(updatedAccounts));
+    }, 100);
     console.log(`Cuenta por cobrar creada automáticamente para venta a crédito: ${saleId}`);
   };
 
@@ -299,7 +422,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       purchaseId
     };
     
-    setAccountsPayable(prev => [...prev, newAccount]);
+    const updatedAccounts = [...accountsPayable, newAccount];
+    setAccountsPayable(updatedAccounts);
+    setTimeout(() => {
+      localStorage.setItem(STORAGE_KEYS.ACCOUNTS_PAYABLE, JSON.stringify(updatedAccounts));
+    }, 100);
     console.log(`Cuenta por pagar creada automáticamente para compra: ${purchaseId}`);
   };
 
@@ -339,6 +466,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (data.accountsReceivable) setAccountsReceivable(data.accountsReceivable);
         if (data.accountsPayable) setAccountsPayable(data.accountsPayable);
         
+        // Save to localStorage
+        saveSettingsToStorage();
+        
         toast.success('Datos restaurados exitosamente');
       } catch (error) {
         toast.error('Error al restaurar el archivo');
@@ -375,7 +505,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       createPayableFromPurchase,
       createBackup,
       restoreBackup,
-      clearSalesData
+      clearSalesData,
+      saveSettingsToStorage,
+      loadSettingsFromStorage
     }}>
       {children}
     </SettingsContext.Provider>

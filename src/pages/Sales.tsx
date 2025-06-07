@@ -5,15 +5,19 @@ import ModernPosInterface from '@/components/sales/ModernPosInterface';
 import PaymentModal from '@/components/sales/PaymentModal';
 import SalesHistory from '@/components/sales/SalesHistory';
 import ShiftSelectionModal from '@/components/cash/ShiftSelectionModal';
+import CashClosureModal from '@/components/cash/CashClosureModal';
 import { usePos } from '@/contexts/PosContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSettings } from '@/contexts/SettingsContext';
 
 const Sales = () => {
   const { cart, cartTotal, customers, currentShift, setCurrentShift } = usePos();
   const { currentUser } = useAuth();
+  const { businessSettings } = useSettings();
   const [showPayment, setShowPayment] = useState(false);
   const [showSalesHistory, setShowSalesHistory] = useState(false);
   const [showShiftSelection, setShowShiftSelection] = useState(false);
+  const [showCashClosure, setShowCashClosure] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('no-customer');
   const [useWholesalePrices, setUseWholesalePrices] = useState(false);
   const [returnData, setReturnData] = useState<{ returnAmount: number, returnId: string } | null>(null);
@@ -67,6 +71,14 @@ const Sales = () => {
     setShowShiftSelection(false);
   };
 
+  // Handle cash closure
+  const handleCloseCash = (closureData: any) => {
+    console.log('Cuadre de caja completado:', closureData);
+    // Here you would typically save the closure data and close the shift
+    setCurrentShift(null);
+    setShowCashClosure(false);
+  };
+
   return (
     <Layout>
       {currentShift ? (
@@ -74,10 +86,13 @@ const Sales = () => {
           <ModernPosInterface
             onShowPayment={handleCheckout}
             onShowHistory={() => setShowSalesHistory(true)}
+            onShowCashClosure={() => setShowCashClosure(true)}
             selectedCustomer={selectedCustomer}
             onCustomerChange={handleCustomerChange}
             useWholesalePrices={useWholesalePrices}
             onWholesalePriceChange={setUseWholesalePrices}
+            businessName={businessSettings?.name || 'Mi Negocio POS'}
+            currency={businessSettings?.currency || 'RD$'}
           />
 
           <PaymentModal 
@@ -95,6 +110,13 @@ const Sales = () => {
             open={showSalesHistory}
             onClose={() => setShowSalesHistory(false)}
             onSelectReturn={handleReturnSelection}
+          />
+
+          <CashClosureModal
+            open={showCashClosure}
+            onClose={() => setShowCashClosure(false)}
+            onCloseCash={handleCloseCash}
+            openingAmount={currentShift.openingAmount || 0}
           />
         </>
       ) : null}
