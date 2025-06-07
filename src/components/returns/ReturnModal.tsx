@@ -16,9 +16,10 @@ interface ReturnModalProps {
   open: boolean;
   onClose: () => void;
   sale: Sale | null;
+  onReturn?: (returnData: { returnId: string; returnTotal: number }) => void;
 }
 
-const ReturnModal: React.FC<ReturnModalProps> = ({ open, onClose, sale }) => {
+const ReturnModal: React.FC<ReturnModalProps> = ({ open, onClose, sale, onReturn }) => {
   const { processReturn, createCreditNote } = usePos();
   const [returningItems, setReturningItems] = useState<Array<{
     productId: string;
@@ -147,6 +148,11 @@ const ReturnModal: React.FC<ReturnModalProps> = ({ open, onClose, sale }) => {
             toast.info('Imprimiendo nota de crédito');
           }, 1000);
         }
+      }
+      
+      // Call onReturn callback if provided
+      if (onReturn) {
+        onReturn({ returnId, returnTotal });
       }
       
       onClose();
