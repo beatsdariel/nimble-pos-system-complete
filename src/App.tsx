@@ -26,22 +26,26 @@ const AppContent = () => {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/sales" element={<Sales />} />
-      
-      {/* Rutas solo para administradores */}
-      {currentUser?.role === 'admin' && (
-        <>
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<Settings />} />
-        </>
-      )}
-      
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <SettingsProvider>
+      <PosProvider>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/sales" element={<Sales />} />
+          
+          {/* Rutas solo para administradores */}
+          {currentUser?.role === 'admin' && (
+            <>
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/settings" element={<Settings />} />
+            </>
+          )}
+          
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </PosProvider>
+    </SettingsProvider>
   );
 };
 
@@ -50,17 +54,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <SettingsProvider>
-            <PosProvider>
-              <BrowserRouter>
-                <div className="min-h-screen bg-gray-50 w-full">
-                  <AppContent />
-                  <Toaster />
-                  <Sonner />
-                </div>
-              </BrowserRouter>
-            </PosProvider>
-          </SettingsProvider>
+          <BrowserRouter>
+            <div className="min-h-screen bg-gray-50 w-full">
+              <AppContent />
+              <Toaster />
+              <Sonner />
+            </div>
+          </BrowserRouter>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
