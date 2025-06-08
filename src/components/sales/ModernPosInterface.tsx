@@ -49,7 +49,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     processBarcodeCommand,
     addCashClosure,
     holdCurrentOrder,
-    validateAccessKey
+    validateAccessKey,
+    lastAddedProductId
   } = usePos();
 
   const [showHoldOrders, setShowHoldOrders] = useState(false);
@@ -184,18 +185,27 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
               <Input
                 type="text"
-                placeholder="Código/+cantidad (ej: +2, +0.5)"
+                placeholder="Código de barras / +cantidad (ej: +2, +0.5)"
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                className="w-56"
+                className="w-72"
                 data-barcode-input
                 autoFocus
               />
-              <Button type="submit" size="sm">Agregar</Button>
+              <Button type="submit" size="sm">Procesar</Button>
             </form>
             <div className="text-sm text-gray-600">
-              <p>Tip: Usa '+' + cantidad para establecer cantidad (ej: +0.5)</p>
-              <p>Presiona Enter en cantidad para confirmar</p>
+              {lastAddedProductId ? (
+                <div className="bg-green-100 px-3 py-1 rounded">
+                  <p className="font-medium text-green-800">Último producto: {getProduct(lastAddedProductId)?.name}</p>
+                  <p className="text-green-600">Usa +cantidad para modificar (ej: +2, +0.5)</p>
+                </div>
+              ) : (
+                <div>
+                  <p>1. Escanea código de barras</p>
+                  <p>2. Usa +cantidad para modificar (ej: +2, +0.5)</p>
+                </div>
+              )}
             </div>
           </div>
           

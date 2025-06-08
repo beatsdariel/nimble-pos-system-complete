@@ -1,857 +1,791 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { Product, CartItem, Customer, PaymentMethod, Sale, ReturnedItem, CreditNote, User, InventoryMovement, Shift, CashSession, CashCount, HeldOrder, InvoiceData, CashSessionSummary } from '@/types/pos';
+import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 import { useSettings } from './SettingsContext';
-import { Product, Customer, CartItem, Sale, ReturnedItem, PaymentMethod, CreditNote, HeldOrder } from '@/types/pos';
-import { Supplier, Purchase, InventoryCount } from '@/types/inventory';
-import { User } from '@/types/auth';
-import { toast } from 'sonner';
 
 interface PosContextType {
-  // Products
   products: Product[];
-  addProduct: (product: Omit<Product, 'id'>) => void;
-  updateProduct: (id: string, updates: Partial<Product>) => void;
-  deleteProduct: (id: string) => void;
-  getProduct: (id: string) => Product | undefined;
-  
-  // Customers
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   customers: Customer[];
-  addCustomer: (customer: Omit<Customer, 'id'>) => string;
-  updateCustomer: (id: string, updates: Partial<Customer>) => void;
-  getCustomer: (id: string) => Customer | undefined;
-  
-  // Cart
+  setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
   cart: CartItem[];
-  addToCart: (product: Product, quantity: number, isWholesale?: boolean) => void;
-  updateCartQuantity: (productId: string, quantity: number) => void;
+  setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
+  addToCart: (productId: string, quantity?: number, forceWholesale?: boolean) => void;
   removeFromCart: (productId: string) => void;
+  updateCartQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
-  cartTotal: number;
   cartSubtotal: number;
   cartTax: number;
-  
-  // Sales
+  cartTotal: number;
+  getProduct: (productId: string) => Product | undefined;
+  getCustomer: (customerId: string) => Customer | undefined;
+  createCustomer: (customer: Omit<Customer, 'id'>) => void;
+  updateCustomer: (customerId: string, updates: Partial<Customer>) => void;
+  deleteCustomer: (customerId: string) => void;
+  processPayment: (paymentMethods: PaymentMethod[], customerId?: string, returnAmount?: number, returnId?: string) => Promise<Sale | CreditNote | undefined>;
   sales: Sale[];
-  completeSale: (sale: Omit<Sale, 'id'>) => Sale | null;
-  getSale: (id: string) => Sale | undefined;
-  
-  // Returns
-  processReturn: (saleId: string, items: ReturnedItem[]) => string;
-  returnedItems: ReturnedItem[];
-  
-  // Credit Notes
+  setSales: React.Dispatch<React.SetStateAction<Sale[]>>;
+  getSale: (saleId: string) => Sale | undefined;
+  recordReturn: (saleId: string, returnedItems: ReturnedItem[], returnReason: string, paymentMethod: PaymentMethod) => Promise<Sale | undefined>;
   creditNotes: CreditNote[];
-  createCreditNote: (creditNote: Omit<CreditNote, 'id'>) => string;
-  getCustomerCreditNotes: (customerId: string) => CreditNote[];
-  useCreditNote: (creditNoteId: string, amount: number) => boolean;
-  
-  // Credit
-  getCustomerCreditBalance: (customerId: string) => number;
-  getCreditSales: (customerId: string) => Sale[];
-  updateCreditSale: (saleId: string, paymentAmount: number, paymentMethod: PaymentMethod) => void;
-  
-  // Suppliers
-  suppliers: Supplier[];
-  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => void;
-  updateSupplier: (id: string, updates: Partial<Supplier>) => void;
-  getSupplier: (id: string) => Supplier | undefined;
-  
-  // Purchases
-  purchases: Purchase[];
-  addPurchase: (purchase: Omit<Purchase, 'id' | 'userId'>) => void;
-  updatePurchase: (id: string, updates: Partial<Purchase>) => void;
-  getPurchase: (id: string) => Purchase | undefined;
-  
-  // Inventory Counts
-  inventoryCounts: InventoryCount[];
-  addInventoryCount: (count: Omit<InventoryCount, 'id' | 'userId'>) => void;
-  updateInventoryCount: (id: string, updates: Partial<InventoryCount>) => void;
-  
-  // User
-  currentUser: User | null;
-  
-  // Shift
-  currentShift: any;
-  setCurrentShift: (shift: any) => void;
-  processBarcodeCommand: (input: string) => void;
-  cashClosures: any[];
-  addCashClosure: (closure: any) => void;
-  
-  // Held Orders
+  setCreditNotes: React.Dispatch<React.SetStateAction<CreditNote[]>>;
+  getCreditNote: (creditNoteId: string) => CreditNote | undefined;
+  applyCreditNote: (creditNoteId: string, saleId: string, paymentMethod: PaymentMethod) => Promise<CreditNote | undefined>;
+  users: User[];
+  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
+  inventoryMovements: InventoryMovement[];
+  setInventoryMovements: React.Dispatch<React.SetStateAction<InventoryMovement[]>>;
+  recordInventoryMovement: (productId: string, type: 'sale' | 'purchase' | 'adjustment' | 'return', quantity: number, reason?: string) => void;
+  shifts: Shift[];
+  setShifts: React.Dispatch<React.SetStateAction<Shift[]>>;
+  createShift: (shift: Omit<Shift, 'id'>) => void;
+  updateShift: (shiftId: string, updates: Partial<Shift>) => void;
+  deleteShift: (shiftId: string) => void;
+  cashSessions: CashSession[];
+  setCashSessions: React.Dispatch<React.SetStateAction<CashSession[]>>;
+  currentShift: CashSession | null;
+  setCurrentShift: React.Dispatch<React.SetStateAction<CashSession | null>>;
+  startCashSession: (shiftId: string, openingAmount: number) => void;
+  closeCashSession: (cashSessionId: string, closingAmount: number, cashCount: CashCount) => void;
   heldOrders: HeldOrder[];
-  holdCurrentOrder: (note?: string) => string;
-  resumeHeldOrder: (orderId: string) => void;
+  setHeldOrders: React.Dispatch<React.SetStateAction<HeldOrder[]>>;
+  holdCurrentOrder: (note?: string) => void;
+  retrieveHeldOrder: (orderId: string) => void;
   deleteHeldOrder: (orderId: string) => void;
-  searchHeldOrders: (searchTerm: string) => HeldOrder[];
-  
-  // Access Control
+  generateInvoiceData: (saleId: string, type?: 'sale' | 'credit-note' | 'return', returnData?: { returnAmount: number; returnId: string; returnItems?: any[]; returnReason?: string; }) => InvoiceData | undefined;
+  cashSessionSummary: (cashSessionId: string) => CashSessionSummary;
+  addCashClosure: (closureData: any) => void;
   validateAccessKey: (action: string, key: string) => boolean;
+  selectedCustomer: string | null;
+  setSelectedCustomer: React.Dispatch<React.SetStateAction<string | null>>;
+  lastAddedProductId: string | null;
+  setLastAddedProductId: React.Dispatch<React.SetStateAction<string | null>>;
+  processBarcodeCommand: (input: string) => void;
 }
 
 const PosContext = createContext<PosContextType | undefined>(undefined);
 
-// Claves de acceso para módulos sensibles
-const ACCESS_KEYS = {
-  'collect-accounts': '1234',
-  'returns': '1234',
-  'sales-history': '1234',
-  'delete-line': '1234',
-  'clear-cart': '1234',
-  'add-customer': '1234'
-};
-
 export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, addCashEntry } = useAuth();
-  const { createReceivableFromCreditSale, createPayableFromPurchase } = useSettings();
-  
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
-  const [returnedItems, setReturnedItems] = useState<ReturnedItem[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [inventoryCounts, setInventoryCounts] = useState<InventoryCount[]>([]);
-  const [currentShift, setCurrentShift] = useState<any>(null);
-  const [cashClosures, setCashClosures] = useState<any[]>([]);
-  const [pendingQuantity, setPendingQuantity] = useState<number | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
+  const [currentShift, setCurrentShift] = useState<CashSession | null>(null);
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>('no-customer');
+  const [lastAddedProductId, setLastAddedProductId] = useState<string | null>(null);
+  const { currentUser } = useAuth();
+  const { businessSettings } = useSettings();
 
-  // Initialize with sample data
-  useEffect(() => {
-    const sampleProducts: Product[] = [
-      {
-        id: '1',
-        name: 'Café Premium',
-        description: 'Café de alta calidad origen dominicano',
-        barcode: '7501234567890',
-        sku: 'CAFE-001',
-        price: 350.00,
-        wholesalePrice: 300.00,
-        cost: 200.00,
-        stock: 25,
-        minStock: 5,
-        category: 'Bebidas',
-        taxRate: 0.18,
-        taxType: 'calculated',
-        image: '/placeholder.svg',
-        allowDecimal: false
-      },
-      {
-        id: '2',
-        name: 'Agua Mineral 500ml',
-        description: 'Agua mineral natural',
-        barcode: '7501234567891',
-        sku: 'AGUA-001',
-        price: 25.00,
-        wholesalePrice: 20.00,
-        cost: 15.00,
-        stock: 100,
-        minStock: 20,
-        category: 'Bebidas',
-        taxRate: 0.18,
-        taxType: 'calculated',
-        image: '/placeholder.svg',
-        allowDecimal: false
-      },
-      {
-        id: '3',
-        name: 'Pan Tostado',
-        description: 'Pan tostado integral',
-        barcode: '7501234567892',
-        sku: 'PAN-001',
-        price: 85.00,
-        wholesalePrice: 70.00,
-        cost: 50.00,
-        stock: 15,
-        minStock: 10,
-        category: 'Panadería',
-        taxRate: 0.18,
-        taxType: 'included',
-        image: '/placeholder.svg',
-        allowDecimal: false
-      },
-      {
-        id: '4',
-        name: 'Refresco Cola 355ml',
-        description: 'Bebida carbonatada sabor cola',
-        barcode: '7501234567893',
-        sku: 'REF-001',
-        price: 45.00,
-        wholesalePrice: 38.00,
-        cost: 25.00,
-        stock: 50,
-        minStock: 15,
-        category: 'Bebidas',
-        taxRate: 0.18,
-        taxType: 'calculated',
-        image: '/placeholder.svg',
-        allowDecimal: false
-      },
-      {
-        id: '5',
-        name: 'Medicamento Genérico',
-        description: 'Medicamento exento de ITBIS',
-        barcode: '7501234567895',
-        sku: 'MED-001',
-        price: 150.00,
-        wholesalePrice: 135.00,
-        cost: 100.00,
-        stock: 20,
-        minStock: 5,
-        category: 'Medicina',
-        taxRate: 0,
-        taxType: 'exempt',
-        image: '/placeholder.svg',
-        allowDecimal: false
-      },
-      {
-        id: '6',
-        name: 'Azúcar Morena',
-        description: 'Azúcar morena por libra',
-        barcode: '7501234567896',
-        sku: 'AZU-001',
-        price: 60.00,
-        wholesalePrice: 50.00,
-        cost: 35.00,
-        stock: 50.5,
-        minStock: 10,
-        category: 'Granos',
-        taxRate: 0.18,
-        taxType: 'calculated',
-        image: '/placeholder.svg',
-        isFractional: true,
-        allowDecimal: true,
-        unitOfMeasure: 'libra',
-        fractionalUnit: 'lb'
-      }
-    ];
-    setProducts(sampleProducts);
+  // Calculate cart subtotal, tax, and total
+  const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const cartTax = cart.reduce((sum, item) => {
+    if (item.taxType === 'included') {
+      return sum;
+    } else if (item.taxType === 'exempt') {
+      return sum + 0;
+    } else {
+      return sum + (item.price * item.quantity * (item.taxRate / 100));
+    }
+  }, 0);
+  const cartTotal = cartSubtotal + cartTax;
 
-    const sampleCustomers: Customer[] = [
-      {
-        id: '1',
-        name: 'Juan Pérez',
-        email: 'juan@email.com',
-        phone: '809-555-1234',
-        document: '001-1234567-8',
-        address: 'Calle Principal 123, Santo Domingo',
-        creditLimit: 5000,
-        creditBalance: 0,
-        isWholesale: true
-      },
-      {
-        id: '2',
-        name: 'María García',
-        email: 'maria@email.com',
-        phone: '809-555-5678',
-        document: '001-2345678-9',
-        address: 'Av. Winston Churchill 456, Santo Domingo',
-        creditLimit: 10000,
-        creditBalance: 0,
-        isWholesale: false
-      }
-    ];
-    setCustomers(sampleCustomers);
-
-    const sampleSuppliers: Supplier[] = [
-      {
-        id: '1',
-        name: 'Distribuidora Nacional',
-        contactName: 'Carlos Rodriguez',
-        email: 'carlos@distribuidora.com',
-        phone: '809-555-9999',
-        address: 'Zona Industrial, Santo Domingo',
-        taxId: '131-123456-7',
-        paymentTerms: '30 días',
-        creditLimit: 50000,
-        isActive: true,
-        createdAt: new Date().toISOString()
-      }
-    ];
-    setSuppliers(sampleSuppliers);
-  }, []);
-
-  // Product functions
-  const addProduct = (product: Omit<Product, 'id'>) => {
-    const newProduct = { ...product, id: Date.now().toString() };
-    setProducts(prev => [...prev, newProduct]);
+  // Helper function to get a product by ID
+  const getProduct = (productId: string): Product | undefined => {
+    return products.find(product => product.id === productId);
   };
 
-  const updateProduct = (id: string, updates: Partial<Product>) => {
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+  // Helper function to get a customer by ID
+  const getCustomer = (customerId: string): Customer | undefined => {
+    return customers.find(customer => customer.id === customerId);
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
-  };
-
-  const getProduct = (id: string) => {
-    return products.find(p => p.id === id);
-  };
-
-  // Customer functions
-  const addCustomer = (customer: Omit<Customer, 'id'>) => {
-    const newCustomer = { 
-      ...customer, 
-      id: Date.now().toString(),
-      creditBalance: 0,
-      creditLimit: customer.creditLimit || 0 
-    };
+  // Function to create a new customer
+  const createCustomer = (customer: Omit<Customer, 'id'>) => {
+    const newCustomer: Customer = { id: uuidv4(), ...customer };
     setCustomers(prev => [...prev, newCustomer]);
-    return newCustomer.id; // Return the new customer ID
+    toast.success('Cliente creado exitosamente');
   };
 
-  const updateCustomer = (id: string, updates: Partial<Customer>) => {
-    setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  // Function to update an existing customer
+  const updateCustomer = (customerId: string, updates: Partial<Customer>) => {
+    setCustomers(prev =>
+      prev.map(customer =>
+        customer.id === customerId ? { ...customer, ...updates } : customer
+      )
+    );
+    toast.success('Cliente actualizado exitosamente');
   };
 
-  const getCustomer = (id: string) => {
-    return customers.find(c => c.id === id);
+  // Function to delete a customer
+  const deleteCustomer = (customerId: string) => {
+    setCustomers(prev => prev.filter(customer => customer.id !== customerId));
+    toast.success('Cliente eliminado exitosamente');
   };
 
-  // Cart functions with improved fractional support
-  const addToCart = (product: Product, quantity: number, isWholesale: boolean = false) => {
-    setCart(prev => {
-      const price = isWholesale && product.wholesalePrice ? product.wholesalePrice : product.price;
-      
-      const existingItem = prev.find(item => 
-        item.productId === product.id && item.isWholesalePrice === isWholesale
-      );
-      
-      if (existingItem) {
-        const newQuantity = existingItem.quantity + quantity;
-        if (newQuantity > product.stock) {
-          console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
-          return prev.map(item =>
-            item.productId === product.id && item.isWholesalePrice === isWholesale
-              ? { ...item, quantity: product.stock }
-              : item
-          );
-        }
-        
-        return prev.map(item =>
-          item.productId === product.id && item.isWholesalePrice === isWholesale
-            ? { ...item, quantity: newQuantity }
-            : item
-        );
-      }
-      
-      if (quantity > product.stock) {
-        console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
-        quantity = product.stock;
-      }
-      
-      // Validar cantidad mínima para productos fraccionarios
-      const minQuantity = product.allowDecimal || product.isFractional ? 0.1 : 1;
-      if (quantity < minQuantity) {
-        quantity = minQuantity;
-      }
-      
-      if (quantity <= 0) return prev;
-      
-      return [...prev, {
-        productId: product.id,
-        name: product.name,
-        price,
-        quantity,
-        taxRate: product.taxRate,
-        isWholesalePrice: isWholesale,
-        taxType: product.taxType || 'calculated'
-      }];
-    });
-  };
-
-  const updateCartQuantity = (productId: string, quantity: number) => {
-    const product = getProduct(productId);
-    const minQuantity = product?.allowDecimal || product?.isFractional ? 0.1 : 1;
-    
-    if (quantity < minQuantity) {
-      removeFromCart(productId);
+  const addToCart = (productId: string, quantity: number = 1, forceWholesale?: boolean) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) {
+      toast.error('Producto no encontrado');
       return;
     }
 
-    if (product && quantity > product.stock) {
-      console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
-      quantity = product.stock;
+    if (product.stock < quantity) {
+      toast.error('Stock insuficiente');
+      return;
     }
 
-    setCart(prev => prev.map(item =>
-      item.productId === productId ? { ...item, quantity } : item
-    ));
-  };
+    const useWholesale = forceWholesale !== undefined ? forceWholesale : 
+      (selectedCustomer && selectedCustomer !== 'no-customer' && 
+       customers.find(c => c.id === selectedCustomer)?.isWholesale);
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.productId !== productId));
-  };
+    const price = useWholesale && product.wholesalePrice ? product.wholesalePrice : product.price;
+    const itemKey = `${productId}-${useWholesale}`;
 
-  const clearCart = () => {
-    setCart([]);
-  };
+    setCart(prev => {
+      const existingItemIndex = prev.findIndex(item => 
+        item.productId === productId && item.isWholesalePrice === useWholesale
+      );
 
-  // Calculate cart totals with improved tax calculation
-  const calculateCartTotals = () => {
-    let subtotal = 0;
-    let tax = 0;
-
-    cart.forEach(item => {
-      const itemSubtotal = item.price * item.quantity;
-      
-      if (item.taxType === 'included') {
-        // ITBIS incluido: separar el impuesto del precio
-        const itemTax = (itemSubtotal * item.taxRate) / (1 + item.taxRate);
-        subtotal += itemSubtotal - itemTax;
-        tax += itemTax;
-      } else if (item.taxType === 'calculated') {
-        // ITBIS calculado: añadir al precio
-        const itemTax = itemSubtotal * item.taxRate;
-        subtotal += itemSubtotal;
-        tax += itemTax;
+      if (existingItemIndex >= 0) {
+        const newCart = [...prev];
+        newCart[existingItemIndex] = {
+          ...newCart[existingItemIndex],
+          quantity: newCart[existingItemIndex].quantity + quantity
+        };
+        return newCart;
       } else {
-        // Sin ITBIS
-        subtotal += itemSubtotal;
+        return [...prev, {
+          productId,
+          name: product.name,
+          price,
+          quantity,
+          taxRate: product.taxRate,
+          isWholesalePrice: useWholesale,
+          taxType: product.taxType || 'included'
+        }];
       }
     });
 
-    return { subtotal, tax, total: subtotal + tax };
+    // Guardar el ID del último producto agregado
+    setLastAddedProductId(productId);
+    
+    // Actualizar stock
+    setProducts(prev => prev.map(p => 
+      p.id === productId ? { ...p, stock: p.stock - quantity } : p
+    ));
   };
 
-  const { subtotal: cartSubtotal, tax: cartTax, total: cartTotal } = calculateCartTotals();
-
-  // Enhanced barcode processing with decimal quantity support
   const processBarcodeCommand = (input: string) => {
-    // Verificar si es un comando de cantidad (+2, +3, +0.5, etc.)
-    const quantityMatch = input.match(/^\+(\d*\.?\d+)$/);
-    if (quantityMatch) {
-      const quantity = parseFloat(quantityMatch[1]);
-      setPendingQuantity(quantity);
-      toast.success(`Cantidad ${quantity} establecida para el próximo producto`);
+    console.log('Procesando comando de código de barras:', input);
+    
+    // Comando de cantidad (+cantidad)
+    if (input.startsWith('+')) {
+      const quantityStr = input.substring(1);
+      const quantity = parseFloat(quantityStr);
+      
+      if (isNaN(quantity) || quantity <= 0) {
+        toast.error('Cantidad inválida');
+        return;
+      }
+
+      // Aplicar la cantidad al último producto agregado
+      if (lastAddedProductId) {
+        const product = products.find(p => p.id === lastAddedProductId);
+        if (product) {
+          // Verificar si el producto permite decimales
+          const allowDecimal = product.allowDecimal || product.isFractional;
+          const finalQuantity = allowDecimal ? quantity : Math.round(quantity);
+          
+          // Actualizar la cantidad del último producto en el carrito
+          updateCartQuantity(lastAddedProductId, finalQuantity);
+          toast.success(`Cantidad actualizada: ${finalQuantity} ${product.fractionalUnit || 'unidades'} de ${product.name}`);
+        } else {
+          toast.error('Producto no encontrado');
+        }
+      } else {
+        toast.info('Primero escanea un producto, luego usa +cantidad');
+      }
       return;
     }
 
     // Buscar producto por código de barras
-    const product = products.find(p => p.barcode === input || p.sku === input);
+    const product = products.find(p => p.barcode === input);
     if (product) {
-      const quantity = pendingQuantity || 1;
-      
-      // Validar cantidad mínima para productos fraccionarios
-      const minQuantity = product.allowDecimal || product.isFractional ? 0.1 : 1;
-      const finalQuantity = Math.max(quantity, minQuantity);
-      
-      if (product.stock < finalQuantity) {
-        toast.error(`Stock insuficiente. Disponible: ${product.stock}`);
-        return;
+      if (product.stock > 0) {
+        addToCart(product.id, 1);
+        toast.success(`${product.name} agregado al carrito`);
+      } else {
+        toast.error('Producto sin stock');
       }
-      
-      addToCart(product, finalQuantity);
-      const displayQuantity = product.allowDecimal || product.isFractional 
-        ? finalQuantity.toFixed(1) 
-        : finalQuantity.toString();
-      toast.success(`${product.name} agregado (${displayQuantity}${product.fractionalUnit ? ' ' + product.fractionalUnit : ''})`);
-      setPendingQuantity(null); // Resetear cantidad pendiente
     } else {
+      toast.error('Código de barras no encontrado');
+    }
+  };
+
+  // Function to remove a product from the cart
+  const removeFromCart = (productId: string) => {
+    setCart(prev => prev.filter(item => item.productId !== productId));
+    // Reset last added product id if the removed item was the last one
+    setLastAddedProductId(prev => prev.length === 1 && prev[0].productId === productId ? null : prev[0]?.productId || null);
+  };
+
+  // Function to update the quantity of a product in the cart
+  const updateCartQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+
+    const product = getProduct(productId);
+    if (!product) {
       toast.error('Producto no encontrado');
+      return;
     }
-  };
 
-  const getSale = (id: string) => {
-    return sales.find(s => s.id === id);
-  };
+    if (product.stock < quantity) {
+      toast.error('Stock insuficiente');
+      return;
+    }
 
-  const createCreditNote = (creditNote: Omit<CreditNote, 'id'>) => {
-    const newCreditNoteId = `CN-${Date.now()}`;
-    const newCreditNote: CreditNote = {
-      ...creditNote,
-      id: newCreditNoteId
-    };
+    setCart(prev => {
+      return prev.map(item => {
+        if (item.productId === productId) {
+          return { ...item, quantity: quantity };
+        }
+        return item;
+      });
+    });
     
-    setCreditNotes(prev => [...prev, newCreditNote]);
-    return newCreditNoteId;
+    // Update stock
+    setProducts(prev => prev.map(p => 
+      p.id === productId ? { ...p, stock: p.stock - quantity } : p
+    ));
   };
 
-  const getCustomerCreditNotes = (customerId: string) => {
-    return creditNotes.filter(note => note.customerId === customerId);
+  const clearCart = () => {
+    setCart([]);
+    setLastAddedProductId(null);
   };
 
-  const useCreditNote = (creditNoteId: string, amount: number) => {
-    setCreditNotes(prev => prev.map(note => {
-      if (note.id === creditNoteId) {
-        const newBalance = note.balance - amount;
-        return {
-          ...note,
-          balance: Math.max(0, newBalance),
-          status: newBalance <= 0 ? 'used' : 'active'
-        };
-      }
-      return note;
-    }));
-    return true;
-  };
+  // Function to process a payment
+  const processPayment = async (paymentMethods: PaymentMethod[], customerId?: string, returnAmount?: number, returnId?: string): Promise<Sale | CreditNote | undefined> => {
+    const saleId = uuidv4();
+    const receiptNumber = generateReceiptNumber();
+    const userId = currentUser?.uid || 'system';
+    const saleDate = new Date().toISOString();
 
-  const getCustomerCreditBalance = (customerId: string) => {
-    const customer = getCustomer(customerId);
-    return customer?.creditBalance || 0;
-  };
+    // Validate payment amounts
+    const totalPaid = paymentMethods.reduce((sum, payment) => sum + payment.amount, 0);
+    const amountDue = returnAmount !== undefined ? returnAmount : cartTotal;
+    if (totalPaid < amountDue) {
+      toast.error('Monto pagado es menor que el total a pagar.');
+      return;
+    }
 
-  const getCreditSales = (customerId: string) => {
-    return sales.filter(s => s.customerId === customerId && s.status === 'credit');
-  };
+    // Handle returns
+    if (returnAmount !== undefined && returnId) {
+      // Create a credit note for the return
+      const creditNoteId = uuidv4();
+      const returnItems = sales.find(s => s.id === returnId)?.items || [];
 
-  const updateCreditSale = (saleId: string, paymentAmount: number, paymentMethod: PaymentMethod) => {
-    setSales(prev => {
-      return prev.map(sale => {
-        if (sale.id === saleId) {
-          const updatedPayments = [...sale.payments, paymentMethod];
-          const totalPaid = updatedPayments.reduce((sum, p) => sum + p.amount, 0);
-          const newStatus = totalPaid >= sale.total ? 'paid-credit' : 'credit';
-          
-          if (sale.customerId && newStatus === 'paid-credit') {
-            const customer = getCustomer(sale.customerId);
-            if (customer) {
-              updateCustomer(customer.id, {
-                creditBalance: (customer.creditBalance || 0) - sale.total
-              });
-            }
+      const newCreditNote: CreditNote = {
+        id: creditNoteId,
+        customerId: customerId || 'no-customer',
+        originalSaleId: returnId,
+        amount: returnAmount,
+        balance: returnAmount,
+        issueDate: saleDate,
+        reason: 'Devolución de venta',
+        status: 'active',
+        returnItems: returnItems.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          returnReason: 'Devolución',
+          returnDate: saleDate,
+          originalSaleId: returnId
+        }))
+      };
+
+      setCreditNotes(prev => [...prev, newCreditNote]);
+      setSales(prevSales => {
+        return prevSales.map(sale => {
+          if (sale.id === returnId) {
+            return {
+              ...sale,
+              status: 'returned',
+              returnedItems: returnItems.map(item => ({
+                productId: item.productId,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                returnReason: 'Devolución',
+                returnDate: saleDate,
+                originalSaleId: returnId
+              }))
+            };
           }
-          
-          return {
-            ...sale,
-            payments: updatedPayments,
-            status: newStatus
-          };
-        }
-        return sale;
-      });
-    });
-
-    if (paymentMethod.type === 'cash' && currentUser) {
-      addCashEntry({
-        type: 'sale',
-        amount: paymentAmount,
-        description: `Pago de crédito ${saleId}`,
-        userId: currentUser.id
-      });
-    }
-  };
-
-  const addSupplier = (supplier: Omit<Supplier, 'id' | 'createdAt'>) => {
-    const newSupplier: Supplier = {
-      ...supplier,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    setSuppliers(prev => [...prev, newSupplier]);
-  };
-
-  const updateSupplier = (id: string, updates: Partial<Supplier>) => {
-    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
-  };
-
-  const getSupplier = (id: string) => {
-    return suppliers.find(s => s.id === id);
-  };
-
-  const addPurchase = (purchase: Omit<Purchase, 'id' | 'userId'>) => {
-    if (!currentUser) return;
-    
-    const newPurchaseId = `PUR-${Date.now()}`;
-    const newPurchase: Purchase = {
-      ...purchase,
-      id: newPurchaseId,
-      userId: currentUser.id
-    };
-    setPurchases(prev => [...prev, newPurchase]);
-    
-    if (purchase.paymentType === 'credit') {
-      const supplier = getSupplier(purchase.supplierId);
-      if (supplier) {
-        const dueDate = purchase.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        createPayableFromPurchase(
-          newPurchaseId,
-          supplier.id,
-          supplier.name,
-          purchase.total,
-          dueDate
-        );
-      }
-    }
-    
-    if (purchase.status === 'received') {
-      purchase.items.forEach(item => {
-        const product = getProduct(item.productId);
-        if (product) {
-          updateProduct(item.productId, {
-            cost: item.unitCost,
-            stock: product.stock + item.quantity,
-            taxType: item.taxType || 'calculated',
-            taxRate: item.taxType === 'exempt' ? 0 : 0.18
-          });
-        }
-      });
-    }
-  };
-
-  const updatePurchase = (id: string, updates: Partial<Purchase>) => {
-    setPurchases(prev => prev.map(p => {
-      if (p.id === id) {
-        const updatedPurchase = { ...p, ...updates };
-        
-        if (updates.status === 'received' && p.status !== 'received') {
-          updatedPurchase.items.forEach(item => {
-            const product = getProduct(item.productId);
-            if (product) {
-              updateProduct(item.productId, {
-                cost: item.unitCost,
-                stock: product.stock + item.quantity,
-                taxType: item.taxType || 'calculated',
-                taxRate: item.taxType === 'exempt' ? 0 : 0.18
-              });
-            }
-          });
-        }
-        
-        return updatedPurchase;
-      }
-      return p;
-    }));
-  };
-
-  const getPurchase = (id: string) => {
-    return purchases.find(p => p.id === id);
-  };
-
-  const addInventoryCount = (count: Omit<InventoryCount, 'id' | 'userId'>) => {
-    if (!currentUser) return;
-    
-    const newCount: InventoryCount = {
-      ...count,
-      id: Date.now().toString(),
-      userId: currentUser.id
-    };
-    setInventoryCounts(prev => [...prev, newCount]);
-  };
-
-  const updateInventoryCount = (id: string, updates: Partial<InventoryCount>) => {
-    setInventoryCounts(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-  };
-
-  const processReturn = (saleId: string, items: ReturnedItem[]) => {
-    if (!currentUser) return "";
-    
-    const originalSale = getSale(saleId);
-    if (!originalSale) return "";
-
-    const returnId = `RET-${Date.now()}`;
-    const returnTotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
-    setReturnedItems([...returnedItems, ...items]);
-    
-    setSales(prev => prev.map(sale => {
-      if (sale.id === saleId) {
-        const allItemsReturned = sale.items.every(item => {
-          const returnedItem = items.find(ri => ri.productId === item.productId);
-          return returnedItem && returnedItem.quantity >= item.quantity;
+          return sale;
         });
-        
-        return {
-          ...sale,
-          status: allItemsReturned ? 'returned' : 'partially-returned',
-          returnedItems: [...(sale.returnedItems || []), ...items]
-        };
-      }
-      return sale;
-    }));
-    
-    items.forEach(item => {
-      updateProduct(item.productId, {
-        stock: (getProduct(item.productId)?.stock || 0) + item.quantity
       });
-    });
-    
-    return returnId;
-  };
 
-  const completeSale = (sale: Omit<Sale, 'id'>) => {
-    if (!currentUser) return null;
+      // Record inventory movements for returned items
+      returnItems.forEach(item => {
+        recordInventoryMovement(item.productId, 'return', item.quantity, 'Devolución de venta');
+      });
 
-    const newSaleId = `SALE-${Date.now()}`;
-    const newSale: Sale = { 
-      ...sale, 
-      id: newSaleId,
-      status: sale.payments.some(p => p.type === 'credit') ? 'credit' : 'completed'
+      // Clear the cart and reset the last added product ID
+      clearCart();
+
+      toast.success('Devolución procesada y nota de crédito generada.');
+      return newCreditNote;
+    }
+
+    // Create a new sale
+    const newSale: Sale = {
+      id: saleId,
+      date: saleDate,
+      items: cart.map(item => ({ ...item })),
+      subtotal: cartSubtotal,
+      tax: cartTax,
+      total: cartTotal,
+      payments: paymentMethods.map(payment => ({ ...payment })),
+      customerId: customerId || 'no-customer',
+      userId: userId,
+      receiptNumber: receiptNumber,
+      status: 'completed',
+      returnedItems: [],
+      dueDate: undefined
     };
-    
+
     setSales(prev => [...prev, newSale]);
-    
-    if (newSale.status === 'credit' && newSale.customerId) {
-      const customer = getCustomer(newSale.customerId);
-      if (customer) {
-        updateCustomer(customer.id, {
-          creditBalance: (customer.creditBalance || 0) + newSale.total
-        });
-        
-        const dueDate = newSale.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        createReceivableFromCreditSale(
-          newSaleId,
-          customer.id,
-          customer.name,
-          newSale.total,
-          dueDate
-        );
-      }
-    }
-    
-    const creditNotePayments = sale.payments.filter(p => p.type === 'credit-note');
-    creditNotePayments.forEach(payment => {
-      if (payment.creditNoteId) {
-        useCreditNote(payment.creditNoteId, payment.amount);
-      }
+
+    // Record inventory movements for sold items
+    cart.forEach(item => {
+      recordInventoryMovement(item.productId, 'sale', item.quantity, 'Venta');
     });
-    
-    const cashPayments = sale.payments.filter(p => p.type === 'cash');
-    if (cashPayments.length > 0 && currentUser) {
-      const totalCash = cashPayments.reduce((sum, p) => sum + p.amount, 0);
-      addCashEntry({
-        type: 'sale',
-        amount: totalCash,
-        description: `Venta ${sale.receiptNumber}`,
-        userId: currentUser.id
-      });
-    }
-    
-    sale.items.forEach(item => {
-      const product = getProduct(item.productId);
-      if (product) {
-        updateProduct(item.productId, {
-          stock: Math.max(0, product.stock - item.quantity)
-        });
-      }
-    });
-    
+
+    // Clear the cart and reset the last added product ID
     clearCart();
+
+    toast.success('Venta procesada exitosamente');
     return newSale;
   };
 
-  const addCashClosure = (closure: any) => {
-    setCashClosures(prev => [...prev, { ...closure, id: Date.now().toString() }]);
+  // Function to generate a unique receipt number
+  const generateReceiptNumber = (): string => {
+    const prefix = businessSettings?.receiptPrefix || 'REC';
+    const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit random number
+    return `${prefix}-${randomNumber}`;
   };
 
-  const holdCurrentOrder = (note?: string) => {
-    if (cart.length === 0) {
-      toast.error('No hay productos en el carrito para guardar');
-      return '';
+  // Function to record a return
+  const recordReturn = async (saleId: string, returnedItems: ReturnedItem[], returnReason: string, paymentMethod: PaymentMethod): Promise<Sale | undefined> => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) {
+      toast.error('Venta no encontrada');
+      return;
     }
 
-    const orderId = `HOLD-${Date.now()}`;
-    const total = cartTotal;
-    
+    // Validate return amounts
+    const totalReturned = returnedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    if (totalReturned > sale.total) {
+      toast.error('Monto de devolución es mayor que el total de la venta.');
+      return;
+    }
+
+    // Update the sale with returned items
+    const updatedSale: Sale = {
+      ...sale,
+      status: 'returned',
+      returnedItems: returnedItems.map(item => ({ ...item, returnReason, returnDate: new Date().toISOString() }))
+    };
+
+    setSales(prev => prev.map(s => s.id === saleId ? updatedSale : s));
+
+    // Record inventory movements for returned items
+    returnedItems.forEach(item => {
+      recordInventoryMovement(item.productId, 'return', item.quantity, returnReason);
+    });
+
+    toast.success('Devolución registrada exitosamente');
+    return updatedSale;
+  };
+
+  // Function to get a sale by ID
+  const getSale = (saleId: string): Sale | undefined => {
+    return sales.find(sale => sale.id === saleId);
+  };
+
+  // Function to get a credit note by ID
+  const getCreditNote = (creditNoteId: string): CreditNote | undefined => {
+    return creditNotes.find(creditNote => creditNote.id === creditNoteId);
+  };
+
+  // Function to apply a credit note to a sale
+  const applyCreditNote = async (creditNoteId: string, saleId: string, paymentMethod: PaymentMethod): Promise<CreditNote | undefined> => {
+    const creditNote = creditNotes.find(cn => cn.id === creditNoteId);
+    if (!creditNote) {
+      toast.error('Nota de crédito no encontrada');
+      return;
+    }
+
+    if (creditNote.status !== 'active') {
+      toast.error('Nota de crédito no está activa');
+      return;
+    }
+
+    if (creditNote.balance <= 0) {
+      toast.error('Nota de crédito no tiene saldo disponible');
+      return;
+    }
+
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) {
+      toast.error('Venta no encontrada');
+      return;
+    }
+
+    // Validate payment amounts
+    if (paymentMethod.amount > creditNote.balance) {
+      toast.error('Monto a pagar con nota de crédito es mayor que el saldo disponible.');
+      return;
+    }
+
+    // Update the credit note
+    const updatedCreditNote: CreditNote = {
+      ...creditNote,
+      balance: creditNote.balance - paymentMethod.amount,
+      status: creditNote.balance - paymentMethod.amount === 0 ? 'used' : 'active'
+    };
+
+    setCreditNotes(prev => prev.map(cn => cn.id === creditNoteId ? updatedCreditNote : cn));
+
+    // Update the sale with the credit note payment
+    const updatedSale: Sale = {
+      ...sale,
+      payments: [...sale.payments, { ...paymentMethod, creditNoteId: creditNoteId }]
+    };
+
+    setSales(prev => prev.map(s => s.id === saleId ? updatedSale : s));
+
+    toast.success('Nota de crédito aplicada exitosamente');
+    return updatedCreditNote;
+  };
+
+  // Function to record an inventory movement
+  const recordInventoryMovement = (productId: string, type: 'sale' | 'purchase' | 'adjustment' | 'return', quantity: number, reason?: string) => {
+    const newInventoryMovement: InventoryMovement = {
+      id: uuidv4(),
+      productId,
+      type,
+      quantity,
+      reason,
+      date: new Date().toISOString(),
+      userId: currentUser?.uid || 'system'
+    };
+
+    setInventoryMovements(prev => [...prev, newInventoryMovement]);
+
+    // Update product stock
+    setProducts(prev => {
+      return prev.map(product => {
+        if (product.id === productId) {
+          let newStock = product.stock;
+          if (type === 'sale') {
+            newStock -= quantity;
+          } else if (type === 'purchase') {
+            newStock += quantity;
+          } else if (type === 'return') {
+            newStock += quantity;
+          } else if (type === 'adjustment') {
+            newStock += quantity;
+          }
+          return { ...product, stock: newStock };
+        }
+        return product;
+      });
+    });
+  };
+
+  // Function to create a new shift
+  const createShift = (shift: Omit<Shift, 'id'>) => {
+    const newShift: Shift = { id: uuidv4(), ...shift };
+    setShifts(prev => [...prev, newShift]);
+    toast.success('Turno creado exitosamente');
+  };
+
+  // Function to update an existing shift
+  const updateShift = (shiftId: string, updates: Partial<Shift>) => {
+    setShifts(prev =>
+      prev.map(shift =>
+        shift.id === shiftId ? { ...shift, ...updates } : shift
+      )
+    );
+    toast.success('Turno actualizado exitosamente');
+  };
+
+  // Function to delete a shift
+  const deleteShift = (shiftId: string) => {
+    setShifts(prev => prev.filter(shift => shift.id !== shiftId));
+    toast.success('Turno eliminado exitosamente');
+  };
+
+  // Function to start a cash session
+  const startCashSession = (shiftId: string, openingAmount: number) => {
+    const newCashSession: CashSession = {
+      id: uuidv4(),
+      userId: currentUser?.uid || 'system',
+      shiftId: shiftId,
+      openingAmount: openingAmount,
+      openingTime: new Date().toISOString(),
+      closingAmount: undefined,
+      closingTime: undefined,
+      status: 'open',
+      sales: [],
+      totalSales: 0,
+      totalCash: 0,
+      totalCard: 0,
+      totalTransfer: 0,
+      totalCredit: 0
+    };
+    setCashSessions(prev => [...prev, newCashSession]);
+    setCurrentShift(newCashSession);
+    toast.success('Sesión de caja iniciada exitosamente');
+  };
+
+  // Function to close a cash session
+  const closeCashSession = (cashSessionId: string, closingAmount: number, cashCount: CashCount) => {
+    const cashSession = cashSessions.find(cs => cs.id === cashSessionId);
+    if (!cashSession) {
+      toast.error('Sesión de caja no encontrada');
+      return;
+    }
+
+    const updatedCashSession: CashSession = {
+      ...cashSession,
+      closingAmount: closingAmount,
+      closingTime: new Date().toISOString(),
+      status: 'closed',
+      actualCash: cashCount.cash,
+      actualCard: cashCount.card,
+      actualTransfer: cashCount.transfer,
+      cashDifference: cashCount.cash - cashSession.totalCash - cashSession.openingAmount,
+      cardDifference: cashCount.card - cashSession.totalCard,
+      transferDifference: cashCount.transfer - cashSession.totalTransfer
+    };
+
+    setCashSessions(prev => prev.map(cs => cs.id === cashSessionId ? updatedCashSession : cs));
+    setCurrentShift(null);
+    toast.success('Sesión de caja cerrada exitosamente');
+  };
+
+  // Function to hold the current order
+  const holdCurrentOrder = (note?: string) => {
+    if (cart.length === 0) {
+      toast.error('No hay productos en el carrito para dejar abierto.');
+      return;
+    }
+
     const newHeldOrder: HeldOrder = {
-      id: orderId,
-      items: [...cart],
-      total,
+      id: uuidv4(),
+      items: cart.map(item => ({ ...item })),
+      customerId: selectedCustomer || undefined,
+      total: cartTotal,
       createdAt: new Date().toISOString(),
-      createdBy: currentUser?.name || 'Usuario',
-      note: note || ''
+      createdBy: currentUser?.uid || 'system',
+      note: note
     };
 
     setHeldOrders(prev => [...prev, newHeldOrder]);
     clearCart();
-    toast.success(`Pedido ${orderId} guardado como abierto`);
-    return orderId;
+    toast.success('Pedido dejado abierto exitosamente');
   };
 
-  const resumeHeldOrder = (orderId: string) => {
-    const order = heldOrders.find(o => o.id === orderId);
-    if (!order) {
+  // Function to retrieve a held order
+  const retrieveHeldOrder = (orderId: string) => {
+    const heldOrder = heldOrders.find(order => order.id === orderId);
+    if (!heldOrder) {
       toast.error('Pedido no encontrado');
       return;
     }
 
-    clearCart();
-    order.items.forEach(item => {
-      const product = getProduct(item.productId);
-      if (product) {
-        addToCart(product, item.quantity, item.isWholesalePrice);
-      }
-    });
-
-    setHeldOrders(prev => prev.filter(o => o.id !== orderId));
-    toast.success(`Pedido ${orderId} reanudado`);
+    setCart(heldOrder.items.map(item => ({ ...item })));
+    setSelectedCustomer(heldOrder.customerId || 'no-customer');
+    setHeldOrders(prev => prev.filter(order => order.id !== orderId));
+    toast.success('Pedido recuperado exitosamente');
   };
 
+  // Function to delete a held order
   const deleteHeldOrder = (orderId: string) => {
-    setHeldOrders(prev => prev.filter(o => o.id !== orderId));
-    toast.success(`Pedido ${orderId} eliminado`);
+    setHeldOrders(prev => prev.filter(order => order.id !== orderId));
+    toast.success('Pedido eliminado exitosamente');
   };
 
-  const searchHeldOrders = (searchTerm: string) => {
-    if (!searchTerm.trim()) return heldOrders;
-    
-    return heldOrders.filter(order => 
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.note?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.createdBy.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  // Function to generate invoice data
+  const generateInvoiceData = (saleId: string, type: 'sale' | 'credit-note' | 'return' = 'sale', returnData?: { returnAmount: number; returnId: string; returnItems?: any[]; returnReason?: string; }): InvoiceData | undefined => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) {
+      toast.error('Venta no encontrada');
+      return;
+    }
+
+    const customer = customers.find(c => c.id === sale.customerId);
+
+    return {
+      type: type,
+      sale: sale,
+      customer: customer,
+      returnData: returnData
+    };
   };
 
-  const validateAccessKey = (action: string, key: string) => {
-    return ACCESS_KEYS[action as keyof typeof ACCESS_KEYS] === key;
+  // Function to calculate cash session summary
+  const cashSessionSummary = (cashSessionId: string): CashSessionSummary => {
+    const cashSession = cashSessions.find(cs => cs.id === cashSessionId);
+    if (!cashSession) {
+      toast.error('Sesión de caja no encontrada');
+      return {
+        totalSales: 0,
+        totalCash: 0,
+        totalCard: 0,
+        totalTransfer: 0,
+        totalCredit: 0,
+        openingAmount: 0,
+        netCashSales: 0,
+        actualAmounts: {
+          cash: 0,
+          card: 0,
+          transfer: 0
+        },
+        differences: {
+          cash: 0,
+          card: 0,
+          transfer: 0,
+          total: 0
+        }
+      };
+    }
+
+    const totalSales = cashSession.sales.reduce((sum, sale) => sum + sale.total, 0);
+    const totalCash = cashSession.sales.reduce((sum, sale) => {
+      const cashPayment = sale.payments.find(payment => payment.type === 'cash');
+      return sum + (cashPayment ? cashPayment.amount : 0);
+    }, 0);
+    const totalCard = cashSession.sales.reduce((sum, sale) => {
+      const cardPayment = sale.payments.find(payment => payment.type === 'card');
+      return sum + (cardPayment ? cardPayment.amount : 0);
+    }, 0);
+    const totalTransfer = cashSession.sales.reduce((sum, sale) => {
+      const transferPayment = sale.payments.find(payment => payment.type === 'transfer');
+      return sum + (transferPayment ? transferPayment.amount : 0);
+    }, 0);
+    const totalCredit = cashSession.sales.reduce((sum, sale) => {
+      const creditPayment = sale.payments.find(payment => payment.type === 'credit');
+      return sum + (creditPayment ? creditPayment.amount : 0);
+    }, 0);
+    const netCashSales = totalCash - cashSession.openingAmount;
+
+    return {
+      totalSales,
+      totalCash,
+      totalCard,
+      totalTransfer,
+      totalCredit,
+      openingAmount: cashSession.openingAmount,
+      netCashSales,
+      actualAmounts: {
+        cash: cashSession.actualCash || 0,
+        card: cashSession.actualCard || 0,
+        transfer: cashSession.actualTransfer || 0
+      },
+      differences: {
+        cash: (cashSession.actualCash || 0) - totalCash - cashSession.openingAmount,
+        card: (cashSession.actualCard || 0) - totalCard,
+        transfer: (cashSession.actualTransfer || 0) - totalTransfer,
+        total: ((cashSession.actualCash || 0) - totalCash - cashSession.openingAmount) + ((cashSession.actualCard || 0) - totalCard) + ((cashSession.actualTransfer || 0) - totalTransfer)
+      }
+    };
   };
 
-  const value: PosContextType = {
+  const addCashClosure = (closureData: any) => {
+    console.log('Cuadre de caja completado:', closureData);
+    // Here you would typically save the closure data and close the shift
+    setCurrentShift(null);
+  };
+
+  const validateAccessKey = (action: string, key: string): boolean => {
+    const validKey = businessSettings?.accessKeys?.[action];
+    return key === validKey;
+  };
+
+  const value = {
     products,
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    getProduct,
+    setProducts,
     customers,
-    addCustomer,
-    updateCustomer,
-    getCustomer,
+    setCustomers,
     cart,
+    setCart,
     addToCart,
-    updateCartQuantity,
     removeFromCart,
+    updateCartQuantity,
     clearCart,
-    cartTotal,
     cartSubtotal,
     cartTax,
+    cartTotal,
+    getProduct,
+    getCustomer,
+    createCustomer,
+    updateCustomer,
+    deleteCustomer,
+    processPayment,
     sales,
-    completeSale,
+    setSales,
     getSale,
-    processReturn,
-    returnedItems,
+    recordReturn,
     creditNotes,
-    createCreditNote,
-    getCustomerCreditNotes,
-    useCreditNote,
-    getCustomerCreditBalance,
-    getCreditSales,
-    updateCreditSale,
-    suppliers,
-    addSupplier,
-    updateSupplier,
-    getSupplier,
-    purchases,
-    addPurchase,
-    updatePurchase,
-    getPurchase,
-    inventoryCounts,
-    addInventoryCount,
-    updateInventoryCount,
-    currentUser,
+    setCreditNotes,
+    getCreditNote,
+    applyCreditNote,
+    users,
+    setUsers,
+    inventoryMovements,
+    setInventoryMovements,
+    recordInventoryMovement,
+    shifts,
+    setShifts,
+    createShift,
+    updateShift,
+    deleteShift,
+    cashSessions,
+    setCashSessions,
     currentShift,
     setCurrentShift,
-    processBarcodeCommand,
-    cashClosures,
-    addCashClosure,
+    startCashSession,
+    closeCashSession,
     heldOrders,
+    setHeldOrders,
     holdCurrentOrder,
-    resumeHeldOrder,
+    retrieveHeldOrder,
     deleteHeldOrder,
-    searchHeldOrders,
+    generateInvoiceData,
+    cashSessionSummary,
+    addCashClosure,
     validateAccessKey,
+    selectedCustomer,
+    setSelectedCustomer,
+    lastAddedProductId,
+    setLastAddedProductId,
+    processBarcodeCommand,
   };
 
   return <PosContext.Provider value={value}>{children}</PosContext.Provider>;
