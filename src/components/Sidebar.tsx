@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -54,10 +55,10 @@ const Sidebar = () => {
 
   return (
     <>
-      <div className="bg-slate-900 text-white w-64 min-h-screen p-4 flex flex-col">
+      <div className="bg-sidebar text-sidebar-foreground w-64 min-h-screen p-4 flex flex-col border-r border-sidebar-border">
         <div className="flex items-center gap-2 mb-8">
-          <Receipt className="h-8 w-8 text-blue-400" />
-          <h1 className="text-xl font-bold">POS System</h1>
+          <Receipt className="h-8 w-8 text-sidebar-primary" />
+          <h1 className="text-xl font-bold text-sidebar-foreground">POS System</h1>
         </div>
         
         <nav className="space-y-2 flex-1">
@@ -70,8 +71,8 @@ const Sidebar = () => {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
                   isActive 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-sidebar-primary text-sidebar-primary-foreground' 
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 )}
               >
                 <item.icon className="h-5 w-5" />
@@ -82,33 +83,33 @@ const Sidebar = () => {
         </nav>
 
         {/* Controles de Caja */}
-        <div className="border-t border-slate-700 pt-4 space-y-2">
+        <div className="border-t border-sidebar-border pt-4 space-y-2">
           <Button
             variant="outline"
             size="sm"
-            className="w-full justify-start text-slate-300 border-slate-600 hover:bg-slate-800"
+            className="w-full justify-start text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             onClick={() => setShowCashClosure(true)}
           >
             <Calculator className="h-4 w-4 mr-2" />
-            Cierre de Caja
+            Cuadre de Cajas
           </Button>
           
           {currentUser?.role === 'admin' && (
             <Button
               variant="outline"
               size="sm"
-              className="w-full justify-start text-slate-300 border-slate-600 hover:bg-slate-800"
+              className="w-full justify-start text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               onClick={() => setShowDayClosure(true)}
             >
               <Calendar className="h-4 w-4 mr-2" />
-              Cierre de Día
+              Finalizar Día
             </Button>
           )}
         </div>
 
         {/* Información del Usuario */}
-        <div className="border-t border-slate-700 pt-4">
-          <div className="text-sm text-slate-400 mb-3">
+        <div className="border-t border-sidebar-border pt-4">
+          <div className="text-sm text-sidebar-foreground mb-3">
             <p>Usuario: {currentUser?.name}</p>
             <p>Rol: {currentUser?.role === 'admin' ? 'Administrador' : 'Empleado'}</p>
           </div>
@@ -116,7 +117,7 @@ const Sidebar = () => {
           <Button
             variant="outline"
             size="sm"
-            className="w-full justify-start text-slate-300 border-slate-600 hover:bg-slate-800"
+            className="w-full justify-start text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4 mr-2" />

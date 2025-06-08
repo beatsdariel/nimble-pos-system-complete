@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,31 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Colores específicos del tema amarillo y negro mate
+				yellow: {
+					50: 'hsl(45, 100%, 96%)',
+					100: 'hsl(45, 100%, 90%)',
+					200: 'hsl(45, 95%, 80%)',
+					300: 'hsl(45, 95%, 70%)',
+					400: 'hsl(45, 95%, 60%)',
+					500: 'hsl(45, 95%, 50%)',
+					600: 'hsl(45, 95%, 45%)',
+					700: 'hsl(45, 95%, 40%)',
+					800: 'hsl(45, 95%, 35%)',
+					900: 'hsl(45, 95%, 30%)',
+				},
+				black: {
+					50: 'hsl(240, 10%, 50%)',
+					100: 'hsl(240, 10%, 40%)',
+					200: 'hsl(240, 10%, 30%)',
+					300: 'hsl(240, 10%, 25%)',
+					400: 'hsl(240, 10%, 20%)',
+					500: 'hsl(240, 10%, 15%)',
+					600: 'hsl(240, 10%, 12%)',
+					700: 'hsl(240, 10%, 10%)',
+					800: 'hsl(240, 10%, 8%)',
+					900: 'hsl(240, 10%, 4%)',
 				}
 			},
 			borderRadius: {

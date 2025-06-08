@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,13 +64,11 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     ? getCustomer(selectedCustomer) 
     : null;
 
-  // Handle barcode submission with enhanced decimal support
-  const handleBarcodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (barcodeInput.trim()) {
-      processBarcodeCommand(barcodeInput.trim());
-      setBarcodeInput('');
+  const handleCheckout = () => {
+    if (cart.length === 0) {
+      return;
     }
+    setShowPayment(true);
   };
 
   // Enhanced keyboard support for quantity modification
@@ -109,6 +106,15 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
       toast.success('Producto eliminado del carrito');
     } else {
       updateCartQuantity(productId, newQuantity);
+    }
+  };
+
+  // Handle barcode submission with enhanced decimal support
+  const handleBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (barcodeInput.trim()) {
+      processBarcodeCommand(barcodeInput.trim());
+      setBarcodeInput('');
     }
   };
 
@@ -174,12 +180,12 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
   const shiftNumber = currentShift?.shiftId || "1";
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Header Fijo */}
-      <div className="bg-white shadow-sm border-b px-6 py-3 flex-shrink-0">
+      <div className="bg-card shadow-sm border-b border-border px-6 py-3 flex-shrink-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-6">
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-primary">
               $ {cartTotal.toFixed(2)}
             </div>
             <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
@@ -188,17 +194,17 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                 placeholder="Código de barras / +cantidad (ej: +2, +0.5)"
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                className="w-72"
+                className="w-72 border-border"
                 data-barcode-input
                 autoFocus
               />
-              <Button type="submit" size="sm">Procesar</Button>
+              <Button type="submit" size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">Procesar</Button>
             </form>
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
               {lastAddedProductId ? (
-                <div className="bg-green-100 px-3 py-1 rounded">
-                  <p className="font-medium text-green-800">Último producto: {getProduct(lastAddedProductId)?.name}</p>
-                  <p className="text-green-600">Usa +cantidad para modificar (ej: +2, +0.5)</p>
+                <div className="bg-primary/10 px-3 py-1 rounded border border-primary/20">
+                  <p className="font-medium text-primary">Último producto: {getProduct(lastAddedProductId)?.name}</p>
+                  <p className="text-primary/80">Usa +cantidad para modificar (ej: +2, +0.5)</p>
                 </div>
               ) : (
                 <div>
@@ -212,7 +218,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-border"
               onClick={handleHoldOrder}
               disabled={cart.length === 0}
             >
@@ -224,7 +230,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
       </div>
 
       {/* Barra de Búsqueda Fija */}
-      <div className="bg-white px-6 py-3 border-b flex-shrink-0">
+      <div className="bg-card px-6 py-3 border-b border-border flex-shrink-0">
         <CentralProductSearch 
           useWholesalePrices={useWholesalePrices}
           onProductSelect={(product) => {
@@ -236,22 +242,22 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
       {/* Contenido Principal - Layout Fijo */}
       <div className="flex-1 flex overflow-hidden">
         {/* Área del Carrito - Fija */}
-        <div className="flex-1 flex flex-col bg-white">
+        <div className="flex-1 flex flex-col bg-card">
           {/* Header del Carrito */}
-          <div className="bg-yellow-400 px-6 py-2 flex-shrink-0">
+          <div className="bg-primary px-6 py-2 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                <span className="font-semibold">Carrito de Compras</span>
+                <ShoppingCart className="h-5 w-5 text-primary-foreground" />
+                <span className="font-semibold text-primary-foreground">Carrito de Compras</span>
               </div>
-              <Badge variant="secondary" className="bg-black text-white">
+              <Badge variant="secondary" className="bg-background text-foreground border border-border">
                 {cart.length} ítem(s)
               </Badge>
             </div>
           </div>
 
           {/* Headers de Tabla */}
-          <div className="bg-gray-800 text-white px-6 py-2 flex-shrink-0">
+          <div className="bg-black-800 text-yellow-50 px-6 py-2 flex-shrink-0">
             <div className="grid grid-cols-12 gap-4 text-sm font-medium">
               <div className="col-span-1">CANT.</div>
               <div className="col-span-6">DESCRIPCIÓN</div>
@@ -263,7 +269,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
           {/* Lista de Productos - Scrollable */}
           <div className="flex-1 overflow-y-auto">
             {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                 <ShoppingCart className="h-16 w-16 mb-4" />
                 <p className="text-xl font-medium">Carrito vacío</p>
                 <p className="text-sm">Busca productos para agregar</p>
@@ -278,7 +284,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                   
                   return (
                     <div key={`${item.productId}-${item.isWholesalePrice}`} 
-                         className={`grid grid-cols-12 gap-4 px-6 py-3 border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                         className={`grid grid-cols-12 gap-4 px-6 py-3 border-b border-border hover:bg-muted/50 ${index % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`}>
                       {/* Cantidad con soporte mejorado para decimales */}
                       <div className="col-span-1 flex items-center">
                         <QuantityInput
@@ -296,18 +302,18 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                       
                       {/* Descripción */}
                       <div className="col-span-6">
-                        <div className="font-medium text-sm">{item.name}</div>
+                        <div className="font-medium text-sm text-foreground">{item.name}</div>
                         <div className="flex gap-2 mt-1">
                           {item.isWholesalePrice && (
-                            <Badge variant="secondary" className="text-xs">Mayoreo</Badge>
+                            <Badge variant="secondary" className="text-xs bg-secondary border-border">Mayoreo</Badge>
                           )}
                           {allowDecimal && (
-                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-600">
+                            <Badge variant="outline" className="text-xs text-primary border-primary">
                               Decimal
                             </Badge>
                           )}
                           {product?.fractionalUnit && (
-                            <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                            <Badge variant="outline" className="text-xs text-accent border-accent">
                               {product.fractionalUnit}
                             </Badge>
                           )}
@@ -315,20 +321,20 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                       </div>
                       
                       {/* Precio */}
-                      <div className="col-span-2 text-sm">
+                      <div className="col-span-2 text-sm text-foreground">
                         RD$ {item.price.toLocaleString()}
                       </div>
                       
                       {/* Total */}
                       <div className="col-span-3 flex justify-between items-center">
-                        <span className="font-medium text-sm">
+                        <span className="font-medium text-sm text-foreground">
                           RD$ {(item.price * item.quantity).toLocaleString()}
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => removeFromCart(item.productId)}
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive/80"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -341,8 +347,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
           </div>
 
           {/* Footer Info - Fijo */}
-          <div className="bg-gray-200 px-6 py-2 border-t flex-shrink-0">
-            <div className="grid grid-cols-5 gap-4 text-sm">
+          <div className="bg-muted px-6 py-2 border-t border-border flex-shrink-0">
+            <div className="grid grid-cols-5 gap-4 text-sm text-muted-foreground">
               <div>
                 <span className="font-medium">Cliente: </span>
                 <span>{selectedCustomerData?.name || 'CONSUMIDOR FINAL'}</span>
@@ -367,14 +373,14 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
           </div>
 
           {/* Total Section - Fijo */}
-          <div className="bg-white px-6 py-3 border-t flex-shrink-0">
+          <div className="bg-card px-6 py-3 border-t border-border flex-shrink-0">
             <div className="flex justify-between items-center">
-              <div className="text-sm">
+              <div className="text-sm text-muted-foreground">
                 <span className="font-medium">Total de Ítems: </span>
                 <span>{cart.reduce((sum, item) => sum + item.quantity, 0).toFixed(2)}</span>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold">
+                <div className="text-2xl font-bold text-primary">
                   TOTAL A PAGAR: RD$ {cartTotal.toLocaleString()}
                 </div>
               </div>
@@ -383,9 +389,9 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
         </div>
 
         {/* Panel Lateral de Acciones - Fijo */}
-        <div className="w-80 bg-white border-l flex flex-col flex-shrink-0">
+        <div className="w-80 bg-card border-l border-border flex flex-col flex-shrink-0">
           {/* Header */}
-          <div className="bg-blue-500 text-white px-4 py-3 text-center flex-shrink-0">
+          <div className="bg-primary text-primary-foreground px-4 py-3 text-center flex-shrink-0">
             <div className="flex items-center justify-center gap-2">
               <BarChart3 className="h-5 w-5" />
               <span className="font-semibold">Punto de Venta</span>
@@ -395,10 +401,10 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
           {/* Contenido Scrollable */}
           <div className="flex-1 overflow-y-auto">
             {/* Customer Management */}
-            <div className="p-4 border-b space-y-3">
+            <div className="p-4 border-b border-border space-y-3">
               <Button
                 variant="outline"
-                className="w-full flex items-center gap-2"
+                className="w-full flex items-center gap-2 border-border"
                 onClick={handleShowQuickCustomer}
               >
                 <UserPlus className="h-4 w-4" />
@@ -413,10 +419,10 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
 
             {/* Order Management */}
-            <div className="p-4 border-b space-y-3">
+            <div className="p-4 border-b border-border space-y-3">
               <Button
                 variant="outline"
-                className="w-full flex items-center gap-2"
+                className="w-full flex items-center gap-2 border-border"
                 onClick={() => setShowHoldOrders(true)}
               >
                 <Clock className="h-4 w-4" />
@@ -425,7 +431,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               
               <Button
                 variant="outline"
-                className="w-full flex items-center gap-2"
+                className="w-full flex items-center gap-2 border-border"
                 onClick={() => setShowHoldOrders(true)}
               >
                 <Search className="h-4 w-4" />
@@ -434,10 +440,10 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
 
             {/* Account Management */}
-            <div className="p-4 border-b space-y-3">
+            <div className="p-4 border-b border-border space-y-3">
               <Button
                 variant="outline"
-                className="w-full bg-green-100 hover:bg-green-200 border-green-300"
+                className="w-full bg-accent/10 hover:bg-accent/20 border-accent text-accent-foreground"
                 onClick={handleShowCollectAccount}
               >
                 <DollarSign className="h-4 w-4 mr-2" />
@@ -446,21 +452,21 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
 
             {/* Cash Management */}
-            <div className="p-4 border-b space-y-3">
+            <div className="p-4 border-b border-border space-y-3">
               <Button
                 variant="outline"
-                className="w-full bg-purple-100 hover:bg-purple-200 border-purple-300"
+                className="w-full bg-primary/10 hover:bg-primary/20 border-primary text-primary"
                 onClick={() => setShowCashClosure(true)}
               >
                 <Calculator className="h-4 w-4 mr-2" />
-                CUADRE DE CAJA
+                CUADRE DE CAJAS
               </Button>
             </div>
 
             {/* Sales History */}
-            <div className="p-4 border-b">
+            <div className="p-4 border-b border-border">
               <Button
-                className="w-full flex items-center gap-2 bg-blue-500 hover:bg-blue-600"
+                className="w-full flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
                 onClick={handleShowHistory}
               >
                 <Receipt className="h-4 w-4" />
@@ -469,10 +475,10 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
 
             {/* Line Actions */}
-            <div className="p-4 border-b space-y-3">
+            <div className="p-4 border-b border-border space-y-3">
               <Button
                 variant="outline"
-                className="w-full bg-red-100 hover:bg-red-200 border-red-300"
+                className="w-full bg-destructive/10 hover:bg-destructive/20 border-destructive text-destructive"
                 onClick={handleDeleteLine}
               >
                 🗑️ BORRAR LÍNEA
@@ -480,7 +486,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               
               <Button
                 variant="outline"
-                className="w-full bg-red-100 hover:bg-red-200 border-red-300"
+                className="w-full bg-destructive/10 hover:bg-destructive/20 border-destructive text-destructive"
                 onClick={handleClearCart}
               >
                 🧹 LIMPIAR TODO
@@ -493,7 +499,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             <div className="p-4 flex-shrink-0">
               <Button
                 onClick={onShowPayment}
-                className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700"
+                className="w-full h-12 text-lg font-semibold bg-accent hover:bg-accent/90 text-accent-foreground"
               >
                 💳 PROCESAR PAGO
               </Button>
