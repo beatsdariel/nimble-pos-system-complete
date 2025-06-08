@@ -43,7 +43,7 @@ export interface CartItem {
   quantity: number;
   taxRate: number;
   isWholesalePrice?: boolean;
-  taxType?: 'included' | 'calculated' | 'exempt';
+  taxType?: 'included' | 'excluded' | 'exempt';
 }
 
 export interface PaymentMethod {
