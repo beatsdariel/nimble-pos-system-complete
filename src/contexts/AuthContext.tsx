@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session, CashRegisterEntry, CashClosure, DayClosure } from '@/types/auth';
 
@@ -8,6 +7,7 @@ interface AuthContextType {
   currentSession: Session | null;
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<boolean>;
+  loginWithAccessKey: (userId: string, accessKey: string) => Promise<boolean>;
   logout: () => void;
   
   // Users management
@@ -15,6 +15,8 @@ interface AuthContextType {
   addUser: (user: Omit<User, 'id' | 'createdAt'>) => void;
   updateUser: (id: string, updates: Partial<User>) => void;
   deleteUser: (id: string) => void;
+  searchUsers: (searchTerm: string) => User[];
+  generateAccessKey: (userId: string) => string;
   
   // Cash register
   cashEntries: CashRegisterEntry[];
@@ -54,7 +56,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: 'Administrador',
         role: 'admin',
         isActive: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        accessKey: '1234'
       },
       {
         id: '2',
@@ -63,7 +66,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: 'Juan Pérez',
         role: 'employee',
         isActive: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        accessKey: '5678'
+      },
+      {
+        id: '3',
+        username: 'empleado2',
+        password: 'emp456',
+        name: 'María García',
+        role: 'employee',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        accessKey: '9876'
       }
     ];
     setUsers(defaultUsers);
@@ -71,6 +85,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string): Promise<boolean> => {
     const user = users.find(u => u.username === username && u.password === password && u.isActive);
+    
+    if (user) {
+      setCurrentUser(user);
+      const session: Session = {
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+        startTime: new Date().toISOString(),
+        isActive: true
+      };
+      setCurrentSession(session);
+      return true;
+    }
+    return false;
+  };
+
+  const loginWithAccessKey = async (userId: string, accessKey: string): Promise<boolean> => {
+    const user = users.find(u => u.id === userId && u.accessKey === accessKey && u.isActive);
     
     if (user) {
       setCurrentUser(user);
@@ -95,11 +127,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentSession(null);
   };
 
+  const searchUsers = (searchTerm: string): User[] => {
+    if (!searchTerm.trim()) return users.filter(u => u.isActive);
+    
+    const term = searchTerm.toLowerCase();
+    return users.filter(u => 
+      u.isActive && (
+        u.name.toLowerCase().includes(term) ||
+        u.username.toLowerCase().includes(term)
+      )
+    );
+  };
+
+  const generateAccessKey = (userId: string): string => {
+    const accessKey = Math.floor(1000 + Math.random() * 9000).toString();
+    updateUser(userId, { accessKey });
+    return accessKey;
+  };
+
   const addUser = (user: Omit<User, 'id' | 'createdAt'>) => {
     const newUser: User = {
       ...user,
       id: Date.now().toString(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      accessKey: Math.floor(1000 + Math.random() * 9000).toString()
     };
     setUsers(prev => [...prev, newUser]);
   };
@@ -168,11 +219,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currentSession,
       isAuthenticated,
       login,
+      loginWithAccessKey,
       logout,
       users,
       addUser,
       updateUser,
       deleteUser,
+      searchUsers,
+      generateAccessKey,
       cashEntries,
       addCashEntry,
       cashClosures,

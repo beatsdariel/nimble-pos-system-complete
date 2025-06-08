@@ -7,19 +7,22 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useSettings } from '@/contexts/SettingsContext';
-import { SystemUser } from '@/types/settings';
-import { Users, Plus, Edit, Trash2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { User } from '@/types/auth';
+import { Users, Plus, Edit, Trash2, Key, RefreshCw } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 const UserManagement = () => {
-  const { systemUsers, addUser, updateUser, deleteUser } = useSettings();
+  const { users, addUser, updateUser, deleteUser, generateAccessKey } = useAuth();
   const [showModal, setShowModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    username: '',
+    password: '',
     role: 'employee' as 'admin' | 'employee',
-    isActive: true
+    isActive: true,
+    accessKey: ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -27,30 +30,64 @@ const UserManagement = () => {
     
     if (editingUser) {
       updateUser(editingUser.id, formData);
+      toast({
+        title: "Usuario actualizado",
+        description: "El usuario ha sido actualizado exitosamente",
+      });
     } else {
       addUser(formData);
+      toast({
+        title: "Usuario creado",
+        description: "El usuario ha sido creado exitosamente",
+      });
     }
     
     setShowModal(false);
     setEditingUser(null);
-    setFormData({ name: '', email: '', role: 'employee', isActive: true });
+    setFormData({ name: '', username: '', password: '', role: 'employee', isActive: true, accessKey: '' });
   };
 
-  const handleEdit = (user: SystemUser) => {
+  const handleEdit = (user: User) => {
     setEditingUser(user);
     setFormData({
       name: user.name,
-      email: user.email,
-      role: user.role as 'admin' | 'employee',
-      isActive: user.isActive
+      username: user.username,
+      password: user.password,
+      role: user.role,
+      isActive: user.isActive,
+      accessKey: user.accessKey || ''
     });
     setShowModal(true);
   };
 
   const handleNew = () => {
     setEditingUser(null);
-    setFormData({ name: '', email: '', role: 'employee', isActive: true });
+    const newAccessKey = Math.floor(1000 + Math.random() * 9000).toString();
+    setFormData({ 
+      name: '', 
+      username: '', 
+      password: '', 
+      role: 'employee', 
+      isActive: true, 
+      accessKey: newAccessKey 
+    });
     setShowModal(true);
+  };
+
+  const handleGenerateAccessKey = (userId: string) => {
+    const newKey = generateAccessKey(userId);
+    toast({
+      title: "Clave de acceso generada",
+      description: `Nueva clave de acceso: ${newKey}`,
+    });
+  };
+
+  const handleDelete = (userId: string) => {
+    deleteUser(userId);
+    toast({
+      title: "Usuario eliminado",
+      description: "El usuario ha sido eliminado exitosamente",
+    });
   };
 
   return (
@@ -74,18 +111,18 @@ const UserManagement = () => {
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">Nombre</th>
-                  <th className="text-left p-2">Email</th>
+                  <th className="text-left p-2">Usuario</th>
                   <th className="text-left p-2">Rol</th>
                   <th className="text-center p-2">Estado</th>
-                  <th className="text-left p-2">Último Acceso</th>
+                  <th className="text-center p-2">Clave de Acceso</th>
                   <th className="text-center p-2">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {systemUsers.map((user) => (
+                {users.map((user) => (
                   <tr key={user.id} className="border-b hover:bg-gray-50">
                     <td className="p-2 font-medium">{user.name}</td>
-                    <td className="p-2">{user.email}</td>
+                    <td className="p-2">{user.username}</td>
                     <td className="p-2">
                       <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
                         {user.role === 'admin' ? 'Administrador' : 'Empleado'}
@@ -96,8 +133,20 @@ const UserManagement = () => {
                         {user.isActive ? 'Activo' : 'Inactivo'}
                       </Badge>
                     </td>
-                    <td className="p-2">
-                      {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Nunca'}
+                    <td className="p-2 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
+                          {user.accessKey || '----'}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleGenerateAccessKey(user.id)}
+                          title="Generar nueva clave"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </td>
                     <td className="p-2 text-center">
                       <div className="flex justify-center gap-2">
@@ -107,7 +156,7 @@ const UserManagement = () => {
                         <Button 
                           size="sm" 
                           variant="outline" 
-                          onClick={() => deleteUser(user.id)}
+                          onClick={() => handleDelete(user.id)}
                           className="text-red-500 hover:text-red-700"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -142,12 +191,22 @@ const UserManagement = () => {
             </div>
             
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Nombre de Usuario</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                id="username"
+                value={formData.username}
+                onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="password">Contraseña</Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                 required
               />
             </div>
@@ -163,6 +222,31 @@ const UserManagement = () => {
                   <SelectItem value="employee">Empleado</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="accessKey">Clave de Acceso (4 dígitos)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="accessKey"
+                  value={formData.accessKey}
+                  onChange={(e) => setFormData(prev => ({ ...prev, accessKey: e.target.value }))}
+                  maxLength={4}
+                  pattern="[0-9]{4}"
+                  placeholder="1234"
+                  className="font-mono"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const newKey = Math.floor(1000 + Math.random() * 9000).toString();
+                    setFormData(prev => ({ ...prev, accessKey: newKey }));
+                  }}
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             
             <div className="flex items-center space-x-2">

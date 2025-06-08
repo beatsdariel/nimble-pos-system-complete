@@ -7,6 +7,7 @@ export interface User {
   role: 'admin' | 'employee';
   isActive: boolean;
   createdAt: string;
+  accessKey?: string; // Clave de acceso de 4 dígitos
 }
 
 export interface Session {
