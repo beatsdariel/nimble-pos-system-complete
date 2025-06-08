@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Product, CartItem, Customer, PaymentMethod, Sale, ReturnedItem, CreditNote, User, InventoryMovement, Shift, CashSession, CashCount, HeldOrder, InvoiceData, CashSessionSummary } from '@/types/pos';
 import { v4 as uuidv4 } from 'uuid';
@@ -67,7 +66,6 @@ interface PosContextType {
   lastAddedProductId: string | null;
   setLastAddedProductId: React.Dispatch<React.SetStateAction<string | null>>;
   processBarcodeCommand: (input: string) => void;
-  // Additional missing properties
   addProduct: (product: Omit<Product, 'id'>) => string;
   updateProduct: (productId: string, updates: Partial<Product>) => void;
   deleteProduct: (productId: string) => void;
@@ -862,7 +860,21 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const completeSale = async (saleData: any): Promise<Sale> => {
-    const newSale: Sale = { id: uuidv4(), ...saleData };
+    const newSale: Sale = { 
+      id: uuidv4(), 
+      date: new Date().toISOString(),
+      items: [],
+      subtotal: 0,
+      tax: 0,
+      total: 0,
+      payments: [],
+      customerId: 'no-customer',
+      userId: currentUser?.id || 'system',
+      receiptNumber: generateReceiptNumber(),
+      status: 'completed',
+      returnedItems: [],
+      ...saleData 
+    };
     setSales(prev => [...prev, newSale]);
     return newSale;
   };

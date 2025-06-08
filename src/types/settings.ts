@@ -1,4 +1,3 @@
-
 export interface BusinessSettings {
   id: string;
   name: string;
@@ -9,6 +8,10 @@ export interface BusinessSettings {
   currency: string;
   taxRate: number;
   logo?: string;
+  receiptPrefix?: string;
+  accessKeys?: {
+    [key: string]: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
