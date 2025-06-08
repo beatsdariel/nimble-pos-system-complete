@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { usePos } from '@/contexts/PosContext';
-import { Search, X, Plus } from 'lucide-react';
+import { Search, X, Plus, Eye } from 'lucide-react';
 import { Product } from '@/types/pos';
 import { toast } from 'sonner';
 
@@ -87,6 +87,13 @@ const ProductSearch: React.FC<ProductSearchProps> = ({ onAddToCart, useWholesale
     }
   };
 
+  const handleViewPrice = (product: Product) => {
+    const price = useWholesalePrices && product.wholesalePrice ? product.wholesalePrice : product.price;
+    toast.info(`${product.name}: RD$ ${price.toLocaleString()}`, {
+      duration: 3000,
+    });
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && filteredProducts.length > 0) {
       handleAddToCart(filteredProducts[0]);
@@ -151,7 +158,8 @@ const ProductSearch: React.FC<ProductSearchProps> = ({ onAddToCart, useWholesale
       {/* Quick Commands Help */}
       <div className="flex flex-wrap gap-2 text-xs text-gray-500">
         <span className="bg-gray-100 px-2 py-1 rounded">Enter: Agregar primer resultado</span>
-        <span className="bg-gray-100 px-2 py-1 rounded">+2: Agregar 2 unidades</span>
+        <span className="bg-blue-100 px-2 py-1 rounded text-blue-700">👁️ Ver precio</span>
+        <span className="bg-green-100 px-2 py-1 rounded text-green-700">+2: Agregar 2 unidades</span>
         <span className="bg-gray-100 px-2 py-1 rounded">Esc: Limpiar</span>
       </div>
 
@@ -179,22 +187,32 @@ const ProductSearch: React.FC<ProductSearchProps> = ({ onAddToCart, useWholesale
                       SKU: {product.sku} | {product.barcode}
                     </p>
                     
-                    <div className="flex justify-between items-center">
-                      <div className="text-right">
-                        <span className="text-sm font-semibold text-green-600">
-                          RD$ {(useWholesalePrices && product.wholesalePrice ? product.wholesalePrice : product.price).toLocaleString()}
-                        </span>
-                        {useWholesalePrices && product.wholesalePrice && (
-                          <p className="text-xs text-gray-400 line-through">
-                            RD$ {product.price.toLocaleString()}
-                          </p>
-                        )}
-                      </div>
+                    <div className="text-center mb-3">
+                      <span className="text-sm font-semibold text-green-600">
+                        RD$ {(useWholesalePrices && product.wholesalePrice ? product.wholesalePrice : product.price).toLocaleString()}
+                      </span>
+                      {useWholesalePrices && product.wholesalePrice && (
+                        <p className="text-xs text-gray-400 line-through">
+                          RD$ {product.price.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleViewPrice(product)}
+                        className="flex-1 h-7 px-2"
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        Ver
+                      </Button>
                       <Button 
                         size="sm" 
                         onClick={() => handleAddToCart(product)}
                         disabled={product.stock === 0}
-                        className="h-7 px-2"
+                        className="flex-1 h-7 px-2"
                       >
                         <Plus className="h-3 w-3 mr-1" />
                         {index === 0 ? 'Enter' : 'Agregar'}
@@ -206,50 +224,6 @@ const ProductSearch: React.FC<ProductSearchProps> = ({ onAddToCart, useWholesale
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Quick Access Products */}
-      {searchTerm === '' && (
-        <div>
-          <h3 className="text-lg font-medium mb-4">Productos Populares</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {products.slice(0, 6).map((product) => (
-              <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-sm">{product.name}</h3>
-                    <Badge variant={product.stock > 0 ? "default" : "destructive"}>
-                      Stock: {product.stock}
-                    </Badge>
-                  </div>
-                  
-                  <p className="text-xs text-gray-500 mb-2">{product.description}</p>
-                  
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="text-lg font-semibold text-green-600">
-                        RD$ {(useWholesalePrices && product.wholesalePrice ? product.wholesalePrice : product.price).toLocaleString()}
-                      </span>
-                      {useWholesalePrices && product.wholesalePrice && (
-                        <p className="text-xs text-gray-400 line-through">
-                          RD$ {product.price.toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleAddToCart(product)}
-                      disabled={product.stock === 0}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Agregar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   );

@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { usePos } from '@/contexts/PosContext';
-import { Search, X, Plus } from 'lucide-react';
+import { Search, X, Plus, Eye, Info } from 'lucide-react';
 import { Product } from '@/types/pos';
 import { toast } from 'sonner';
 
@@ -27,6 +28,7 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [showPriceInfo, setShowPriceInfo] = useState<string | null>(null);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -64,6 +66,7 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
     if (e.key === 'Escape') {
       setSearchTerm('');
       setFilteredProducts([]);
+      setShowPriceInfo(null);
     }
   };
 
@@ -78,6 +81,14 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
     }
   };
 
+  const handleViewPrice = (product: Product) => {
+    setShowPriceInfo(product.id);
+    const price = useWholesalePrices && product.wholesalePrice ? product.wholesalePrice : product.price;
+    toast.info(`${product.name}: RD$ ${price.toLocaleString()}`, {
+      duration: 3000,
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Search Input */}
@@ -87,7 +98,7 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
         </div>
         <Input
           type="text"
-          placeholder="Buscar productos o usar comandos: código, +cantidad (ej: +2, +0.5)..."
+          placeholder="Buscar productos, consultar precios o usar comandos: código, +cantidad (ej: +2, +0.5)..."
           value={searchTerm}
           onChange={(e) => handleSearch(e.target.value)}
           onKeyDown={handleKeyPress}
@@ -101,6 +112,7 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
             onClick={() => {
               setSearchTerm('');
               setFilteredProducts([]);
+              setShowPriceInfo(null);
             }}
             className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
           >
@@ -127,8 +139,8 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
       {/* Quick Commands Help */}
       <div className="flex flex-wrap gap-2 text-xs text-gray-500">
         <span className="bg-gray-100 px-2 py-1 rounded">Enter: Procesar comando</span>
-        <span className="bg-gray-100 px-2 py-1 rounded">+2: Cambiar cantidad a 2</span>
-        <span className="bg-gray-100 px-2 py-1 rounded">+0.5: Cambiar cantidad a 0.5</span>
+        <span className="bg-blue-100 px-2 py-1 rounded text-blue-700">👁️ Ver precio</span>
+        <span className="bg-green-100 px-2 py-1 rounded text-green-700">➕ Agregar al carrito</span>
         <span className="bg-gray-100 px-2 py-1 rounded">Esc: Limpiar</span>
       </div>
 
@@ -169,22 +181,32 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
                       </div>
                     )}
                     
-                    <div className="flex justify-between items-center">
-                      <div className="text-right">
-                        <span className="text-sm font-semibold text-green-600">
-                          RD$ {(useWholesalePrices && product.wholesalePrice ? product.wholesalePrice : product.price).toLocaleString()}
-                        </span>
-                        {useWholesalePrices && product.wholesalePrice && (
-                          <p className="text-xs text-gray-400 line-through">
-                            RD$ {product.price.toLocaleString()}
-                          </p>
-                        )}
-                      </div>
+                    <div className="text-center mb-3">
+                      <span className="text-lg font-bold text-green-600">
+                        RD$ {(useWholesalePrices && product.wholesalePrice ? product.wholesalePrice : product.price).toLocaleString()}
+                      </span>
+                      {useWholesalePrices && product.wholesalePrice && (
+                        <p className="text-xs text-gray-400 line-through">
+                          RD$ {product.price.toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleViewPrice(product)}
+                        className="flex-1 h-7 px-2"
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        Ver Precio
+                      </Button>
                       <Button 
                         size="sm" 
                         onClick={() => handleAddToCart(product)}
                         disabled={product.stock === 0}
-                        className="h-7 px-2"
+                        className="flex-1 h-7 px-2"
                       >
                         <Plus className="h-3 w-3 mr-1" />
                         Agregar
@@ -196,50 +218,6 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Quick Access Products */}
-      {searchTerm === '' && (
-        <div>
-          <h3 className="text-lg font-medium mb-4">Productos Populares</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {products.slice(0, 6).map((product) => (
-              <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-sm">{product.name}</h3>
-                    <Badge variant={product.stock > 0 ? "default" : "destructive"}>
-                      Stock: {product.stock}
-                    </Badge>
-                  </div>
-                  
-                  <p className="text-xs text-gray-500 mb-2">{product.description}</p>
-                  
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="text-lg font-semibold text-green-600">
-                        RD$ {(useWholesalePrices && product.wholesalePrice ? product.wholesalePrice : product.price).toLocaleString()}
-                      </span>
-                      {useWholesalePrices && product.wholesalePrice && (
-                        <p className="text-xs text-gray-400 line-through">
-                          RD$ {product.price.toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleAddToCart(product)}
-                      disabled={product.stock === 0}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Agregar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
       )}
     </div>
   );

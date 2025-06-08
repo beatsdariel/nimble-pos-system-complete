@@ -123,15 +123,26 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   } : null;
 
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  // Updated tax calculation - only calculate ITBIS for products that have tax enabled
   const cartTax = cart.reduce((sum, item) => {
+    const product = products.find(p => p.id === item.productId);
+    
+    // Only calculate tax if the product has tax enabled (hasTax !== false)
+    if (!product || product.hasTax === false) {
+      return sum; // No tax for this item
+    }
+
     if (item.taxType === 'included') {
-      return sum;
+      return sum; // Tax already included in price
     } else if (item.taxType === 'exempt') {
-      return sum + 0;
+      return sum + 0; // Exempt from tax
     } else {
+      // Tax excluded - calculate and add
       return sum + (item.price * item.quantity * (item.taxRate / 100));
     }
   }, 0);
+  
   const cartTotal = cartSubtotal + cartTax;
 
   const getProduct = (productId: string): Product | undefined => {
