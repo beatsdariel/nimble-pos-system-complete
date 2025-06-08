@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -175,6 +174,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       })
     };
 
+    // Fix: completeSale now returns Sale directly, not Promise<Sale>
     const sale = completeSale(saleData);
     
     if (sale) {
