@@ -36,7 +36,7 @@ interface PosContextType {
   completeSale: (saleData: any) => Sale;
   getCreditSales: (customerId: string) => Sale[];
   updateCreditSale: (saleId: string, paymentAmount: number, paymentMethod: PaymentMethod) => void;
-  processReturn: (saleId: string, returnItems: any[], reason: string) => void;
+  processReturn: (saleId: string, returnItems: any[], reason?: string) => string;
 
   // Credit Notes
   creditNotes: CreditNote[];
@@ -56,11 +56,14 @@ interface PosContextType {
   cashSessions: CashSession[];
   currentShift: CashSession | null;
   setCurrentShift: React.Dispatch<React.SetStateAction<CashSession | null>>;
+  addCashClosure: (closureData: any) => void;
 
   // Held orders
   heldOrders: HeldOrder[];
   resumeHeldOrder: (orderId: string) => void;
   searchHeldOrders: (searchTerm: string) => HeldOrder[];
+  deleteHeldOrder: (orderId: string) => void;
+  holdCurrentOrder: (note?: string) => void;
 
   // Customer selection
   selectedCustomer: string;
@@ -70,6 +73,9 @@ interface PosContextType {
   lastAddedProductId: string | null;
   setLastAddedProductId: React.Dispatch<React.SetStateAction<string | null>>;
   processBarcodeCommand: (input: string) => void;
+
+  // Access validation
+  validateAccessKey: (action: string, key: string) => boolean;
 
   // Suppliers and purchases
   suppliers: any[];
@@ -105,8 +111,16 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [purchases, setPurchases] = useState<any[]>([]);
   const [inventoryCounts, setInventoryCounts] = useState<any[]>([]);
 
-  const { currentUser } = useAuth();
+  const { currentUser: authUser } = useAuth();
   const { businessSettings } = useSettings();
+
+  const currentUser: User | null = authUser ? {
+    id: authUser.id,
+    name: authUser.name,
+    email: authUser.username + '@system.local', // Provide default email
+    role: authUser.role === 'admin' ? 'admin' : 'cashier',
+    permissions: authUser.role === 'admin' ? ['all'] : ['sales']
+  } : null;
 
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartTax = cart.reduce((sum, item) => {
@@ -330,7 +344,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setSales(prev => [...prev, newSale]);
     
-    // Clear cart after completing sale
     clearCart();
     
     return newSale;
@@ -359,7 +372,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return sale;
     }));
 
-    // Update customer credit balance
     const sale = sales.find(s => s.id === saleId);
     if (sale?.customerId) {
       setCustomers(prev => prev.map(customer => {
@@ -377,9 +389,46 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toast.success('Pago aplicado exitosamente');
   };
 
-  const processReturn = (saleId: string, returnItems: any[], reason: string): void => {
-    // Implementation for processing returns
-    console.log('Processing return:', { saleId, returnItems, reason });
+  const processReturn = (saleId: string, returnItems: any[], reason?: string): string => {
+    const returnId = uuidv4();
+    const returnDate = new Date().toISOString();
+    
+    setSales(prev => prev.map(sale => {
+      if (sale.id === saleId) {
+        const returnedItems: ReturnedItem[] = returnItems.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.returnQuantity || item.quantity,
+          returnReason: reason || item.reason || 'Devolución',
+          returnDate,
+          originalSaleId: saleId
+        }));
+
+        return {
+          ...sale,
+          status: 'returned',
+          returnedItems: [...(sale.returnedItems || []), ...returnedItems]
+        };
+      }
+      return sale;
+    }));
+
+    // Update inventory for returned items
+    returnItems.forEach(item => {
+      const quantity = item.returnQuantity || item.quantity;
+      recordInventoryMovement(item.productId, 'return', quantity, reason || 'Devolución');
+      
+      // Restore stock
+      setProducts(prev => prev.map(product => 
+        product.id === item.productId 
+          ? { ...product, stock: product.stock + quantity }
+          : product
+      ));
+    });
+
+    toast.success('Devolución procesada exitosamente');
+    return returnId;
   };
 
   const createCreditNote = (creditNoteData: any): CreditNote => {
@@ -411,6 +460,48 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.note?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+  };
+
+  const deleteHeldOrder = (orderId: string): void => {
+    setHeldOrders(prev => prev.filter(order => order.id !== orderId));
+    toast.success('Pedido eliminado');
+  };
+
+  const holdCurrentOrder = (note?: string): void => {
+    if (cart.length === 0) {
+      toast.error('El carrito está vacío');
+      return;
+    }
+
+    const heldOrder: HeldOrder = {
+      id: `HOLD-${Date.now()}`,
+      items: [...cart],
+      customerId: selectedCustomer !== 'no-customer' ? selectedCustomer : undefined,
+      total: cartTotal,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser?.name || 'Sistema',
+      note: note || undefined
+    };
+
+    setHeldOrders(prev => [...prev, heldOrder]);
+    clearCart();
+    toast.success('Pedido guardado');
+  };
+
+  const addCashClosure = (closureData: any): void => {
+    console.log('Cerrando caja:', closureData);
+    toast.success('Cierre de caja completado');
+  };
+
+  const validateAccessKey = (action: string, key: string): boolean => {
+    const accessKeys = businessSettings?.accessKeys || {};
+    const requiredKey = accessKeys[action];
+    
+    if (!requiredKey) {
+      return true; // No key required for this action
+    }
+    
+    return key === requiredKey;
   };
 
   const addSupplier = (supplier: any): string => {
@@ -500,11 +591,14 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cashSessions,
     currentShift,
     setCurrentShift,
+    addCashClosure,
 
     // Held orders
     heldOrders,
     resumeHeldOrder,
     searchHeldOrders,
+    deleteHeldOrder,
+    holdCurrentOrder,
 
     // Customer selection
     selectedCustomer,
@@ -514,6 +608,9 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     lastAddedProductId,
     setLastAddedProductId,
     processBarcodeCommand,
+
+    // Access validation
+    validateAccessKey,
 
     // Suppliers and purchases
     suppliers,
