@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Product, CartItem, Customer, PaymentMethod, Sale, ReturnedItem, CreditNote, User, InventoryMovement, Shift, CashSession, CashCount, HeldOrder, InvoiceData, CashSessionSummary } from '@/types/pos';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,6 +22,7 @@ interface PosContextType {
   cartTotal: number;
   getProduct: (productId: string) => Product | undefined;
   getCustomer: (customerId: string) => Customer | undefined;
+  addCustomer: (customer: Omit<Customer, 'id'>) => string;
   createCustomer: (customer: Omit<Customer, 'id'>) => void;
   updateCustomer: (customerId: string, updates: Partial<Customer>) => void;
   deleteCustomer: (customerId: string) => void;
@@ -53,7 +55,9 @@ interface PosContextType {
   setHeldOrders: React.Dispatch<React.SetStateAction<HeldOrder[]>>;
   holdCurrentOrder: (note?: string) => void;
   retrieveHeldOrder: (orderId: string) => void;
+  resumeHeldOrder: (orderId: string) => void;
   deleteHeldOrder: (orderId: string) => void;
+  searchHeldOrders: (searchTerm: string) => HeldOrder[];
   generateInvoiceData: (saleId: string, type?: 'sale' | 'credit-note' | 'return', returnData?: { returnAmount: number; returnId: string; returnItems?: any[]; returnReason?: string; }) => InvoiceData | undefined;
   cashSessionSummary: (cashSessionId: string) => CashSessionSummary;
   addCashClosure: (closureData: any) => void;
@@ -63,6 +67,26 @@ interface PosContextType {
   lastAddedProductId: string | null;
   setLastAddedProductId: React.Dispatch<React.SetStateAction<string | null>>;
   processBarcodeCommand: (input: string) => void;
+  // Additional missing properties
+  addProduct: (product: Omit<Product, 'id'>) => string;
+  updateProduct: (productId: string, updates: Partial<Product>) => void;
+  deleteProduct: (productId: string) => void;
+  suppliers: any[];
+  purchases: any[];
+  inventoryCounts: any[];
+  addInventoryCount: (count: any) => string;
+  updateInventoryCount: (countId: string, updates: any) => void;
+  addSupplier: (supplier: any) => string;
+  updateSupplier: (supplierId: string, updates: any) => void;
+  addPurchase: (purchase: any) => string;
+  updatePurchase: (purchaseId: string, updates: any) => void;
+  getCreditSales: (customerId: string) => Sale[];
+  processReturn: (saleId: string, returnItems: ReturnedItem[]) => string;
+  createCreditNote: (creditNote: Omit<CreditNote, 'id'>) => string;
+  getCustomerCreditNotes: (customerId: string) => CreditNote[];
+  updateCreditSale: (saleId: string, updates: Partial<Sale>) => void;
+  completeSale: (saleData: any) => Promise<Sale>;
+  currentUser: any;
 }
 
 const PosContext = createContext<PosContextType | undefined>(undefined);
@@ -81,6 +105,9 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>('no-customer');
   const [lastAddedProductId, setLastAddedProductId] = useState<string | null>(null);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [inventoryCounts, setInventoryCounts] = useState<any[]>([]);
   const { currentUser } = useAuth();
   const { businessSettings } = useSettings();
 
@@ -107,11 +134,43 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return customers.find(customer => customer.id === customerId);
   };
 
+  // Function to add a product
+  const addProduct = (product: Omit<Product, 'id'>): string => {
+    const newProduct: Product = { id: uuidv4(), ...product };
+    setProducts(prev => [...prev, newProduct]);
+    toast.success('Producto agregado exitosamente');
+    return newProduct.id;
+  };
+
+  // Function to update a product
+  const updateProduct = (productId: string, updates: Partial<Product>) => {
+    setProducts(prev =>
+      prev.map(product =>
+        product.id === productId ? { ...product, ...updates } : product
+      )
+    );
+    toast.success('Producto actualizado exitosamente');
+  };
+
+  // Function to delete a product
+  const deleteProduct = (productId: string) => {
+    setProducts(prev => prev.filter(product => product.id !== productId));
+    toast.success('Producto eliminado exitosamente');
+  };
+
   // Function to create a new customer
   const createCustomer = (customer: Omit<Customer, 'id'>) => {
     const newCustomer: Customer = { id: uuidv4(), ...customer };
     setCustomers(prev => [...prev, newCustomer]);
     toast.success('Cliente creado exitosamente');
+  };
+
+  // Function to add a customer (alias for createCustomer)
+  const addCustomer = (customer: Omit<Customer, 'id'>): string => {
+    const newCustomer: Customer = { id: uuidv4(), ...customer };
+    setCustomers(prev => [...prev, newCustomer]);
+    toast.success('Cliente creado exitosamente');
+    return newCustomer.id;
   };
 
   // Function to update an existing customer
@@ -147,7 +206,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
        customers.find(c => c.id === selectedCustomer)?.isWholesale);
 
     const price = useWholesale && product.wholesalePrice ? product.wholesalePrice : product.price;
-    const itemKey = `${productId}-${useWholesale}`;
 
     setCart(prev => {
       const existingItemIndex = prev.findIndex(item => 
@@ -234,7 +292,9 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const removeFromCart = (productId: string) => {
     setCart(prev => prev.filter(item => item.productId !== productId));
     // Reset last added product id if the removed item was the last one
-    setLastAddedProductId(prev => prev.length === 1 && prev[0].productId === productId ? null : prev[0]?.productId || null);
+    if (lastAddedProductId === productId) {
+      setLastAddedProductId(null);
+    }
   };
 
   // Function to update the quantity of a product in the cart
@@ -250,11 +310,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    if (product.stock < quantity) {
-      toast.error('Stock insuficiente');
-      return;
-    }
-
     setCart(prev => {
       return prev.map(item => {
         if (item.productId === productId) {
@@ -263,11 +318,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return item;
       });
     });
-    
-    // Update stock
-    setProducts(prev => prev.map(p => 
-      p.id === productId ? { ...p, stock: p.stock - quantity } : p
-    ));
   };
 
   const clearCart = () => {
@@ -279,7 +329,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const processPayment = async (paymentMethods: PaymentMethod[], customerId?: string, returnAmount?: number, returnId?: string): Promise<Sale | CreditNote | undefined> => {
     const saleId = uuidv4();
     const receiptNumber = generateReceiptNumber();
-    const userId = currentUser?.uid || 'system';
+    const userId = currentUser?.id || 'system';
     const saleDate = new Date().toISOString();
 
     // Validate payment amounts
@@ -491,7 +541,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       quantity,
       reason,
       date: new Date().toISOString(),
-      userId: currentUser?.uid || 'system'
+      userId: currentUser?.id || 'system'
     };
 
     setInventoryMovements(prev => [...prev, newInventoryMovement]);
@@ -544,7 +594,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const startCashSession = (shiftId: string, openingAmount: number) => {
     const newCashSession: CashSession = {
       id: uuidv4(),
-      userId: currentUser?.uid || 'system',
+      userId: currentUser?.id || 'system',
       shiftId: shiftId,
       openingAmount: openingAmount,
       openingTime: new Date().toISOString(),
@@ -602,7 +652,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customerId: selectedCustomer || undefined,
       total: cartTotal,
       createdAt: new Date().toISOString(),
-      createdBy: currentUser?.uid || 'system',
+      createdBy: currentUser?.id || 'system',
       note: note
     };
 
@@ -625,10 +675,27 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toast.success('Pedido recuperado exitosamente');
   };
 
+  // Function to resume a held order (alias for retrieveHeldOrder)
+  const resumeHeldOrder = (orderId: string) => {
+    retrieveHeldOrder(orderId);
+  };
+
   // Function to delete a held order
   const deleteHeldOrder = (orderId: string) => {
     setHeldOrders(prev => prev.filter(order => order.id !== orderId));
     toast.success('Pedido eliminado exitosamente');
+  };
+
+  // Function to search held orders
+  const searchHeldOrders = (searchTerm: string): HeldOrder[] => {
+    if (!searchTerm.trim()) return heldOrders;
+    
+    const lowercaseSearch = searchTerm.toLowerCase();
+    return heldOrders.filter(order => 
+      order.id.toLowerCase().includes(lowercaseSearch) ||
+      order.note?.toLowerCase().includes(lowercaseSearch) ||
+      order.createdBy.toLowerCase().includes(lowercaseSearch)
+    );
   };
 
   // Function to generate invoice data
@@ -728,6 +795,78 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return key === validKey;
   };
 
+  // Additional helper functions
+  const addInventoryCount = (count: any): string => {
+    const newCount = { id: uuidv4(), ...count };
+    setInventoryCounts(prev => [...prev, newCount]);
+    return newCount.id;
+  };
+
+  const updateInventoryCount = (countId: string, updates: any) => {
+    setInventoryCounts(prev => prev.map(count => 
+      count.id === countId ? { ...count, ...updates } : count
+    ));
+  };
+
+  const addSupplier = (supplier: any): string => {
+    const newSupplier = { id: uuidv4(), ...supplier };
+    setSuppliers(prev => [...prev, newSupplier]);
+    return newSupplier.id;
+  };
+
+  const updateSupplier = (supplierId: string, updates: any) => {
+    setSuppliers(prev => prev.map(supplier =>
+      supplier.id === supplierId ? { ...supplier, ...updates } : supplier
+    ));
+  };
+
+  const addPurchase = (purchase: any): string => {
+    const newPurchase = { id: uuidv4(), ...purchase };
+    setPurchases(prev => [...prev, newPurchase]);
+    return newPurchase.id;
+  };
+
+  const updatePurchase = (purchaseId: string, updates: any) => {
+    setPurchases(prev => prev.map(purchase =>
+      purchase.id === purchaseId ? { ...purchase, ...updates } : purchase
+    ));
+  };
+
+  const getCreditSales = (customerId: string): Sale[] => {
+    return sales.filter(sale => 
+      sale.customerId === customerId && 
+      sale.payments.some(payment => payment.type === 'credit')
+    );
+  };
+
+  const processReturn = (saleId: string, returnItems: ReturnedItem[]): string => {
+    const returnId = uuidv4();
+    // Process return logic here
+    return returnId;
+  };
+
+  const createCreditNote = (creditNote: Omit<CreditNote, 'id'>): string => {
+    const newCreditNote: CreditNote = { id: uuidv4(), ...creditNote };
+    setCreditNotes(prev => [...prev, newCreditNote]);
+    return newCreditNote.id;
+  };
+
+  const getCustomerCreditNotes = (customerId: string): CreditNote[] => {
+    return creditNotes.filter(note => note.customerId === customerId);
+  };
+
+  const updateCreditSale = (saleId: string, updates: Partial<Sale>) => {
+    setSales(prev => prev.map(sale =>
+      sale.id === saleId ? { ...sale, ...updates } : sale
+    ));
+  };
+
+  const completeSale = async (saleData: any): Promise<Sale> => {
+    const newSale: Sale = { id: uuidv4(), ...saleData };
+    setSales(prev => [...prev, newSale]);
+    return newSale;
+  };
+
   const value = {
     products,
     setProducts,
@@ -744,6 +883,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cartTotal,
     getProduct,
     getCustomer,
+    addCustomer,
     createCustomer,
     updateCustomer,
     deleteCustomer,
@@ -776,7 +916,9 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setHeldOrders,
     holdCurrentOrder,
     retrieveHeldOrder,
+    resumeHeldOrder,
     deleteHeldOrder,
+    searchHeldOrders,
     generateInvoiceData,
     cashSessionSummary,
     addCashClosure,
@@ -786,6 +928,25 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     lastAddedProductId,
     setLastAddedProductId,
     processBarcodeCommand,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    suppliers,
+    purchases,
+    inventoryCounts,
+    addInventoryCount,
+    updateInventoryCount,
+    addSupplier,
+    updateSupplier,
+    addPurchase,
+    updatePurchase,
+    getCreditSales,
+    processReturn,
+    createCreditNote,
+    getCustomerCreditNotes,
+    updateCreditSale,
+    completeSale,
+    currentUser,
   };
 
   return <PosContext.Provider value={value}>{children}</PosContext.Provider>;

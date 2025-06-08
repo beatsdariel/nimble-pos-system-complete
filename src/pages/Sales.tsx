@@ -59,13 +59,23 @@ const Sales = () => {
     setShowPayment(true);
   };
 
-  // Handle shift start
+  // Handle shift start - Create a proper CashSession object
   const handleStartShift = (shiftId: string, openingAmount: number) => {
     const shiftData = { 
+      id: `session-${Date.now()}`,
+      userId: currentUser?.id || 'system',
       shiftId, 
       openingAmount, 
-      startTime: new Date().toISOString(),
-      status: 'open'
+      openingTime: new Date().toISOString(),
+      closingAmount: undefined,
+      closingTime: undefined,
+      status: 'open' as const,
+      sales: [],
+      totalSales: 0,
+      totalCash: 0,
+      totalCard: 0,
+      totalTransfer: 0,
+      totalCredit: 0
     };
     setCurrentShift(shiftData);
     setShowShiftSelection(false);
