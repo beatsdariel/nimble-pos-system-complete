@@ -17,6 +17,7 @@ export interface Product {
   isFractional?: boolean;
   unitOfMeasure?: 'caja' | 'paquete' | 'libra' | 'unidad' | 'metro' | 'kilogramo';
   fractionalUnit?: string;
+  allowDecimal?: boolean; // Nueva propiedad para permitir decimales
 }
 
 export interface Customer {

@@ -135,7 +135,8 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: 'Bebidas',
         taxRate: 0.18,
         taxType: 'calculated',
-        image: '/placeholder.svg'
+        image: '/placeholder.svg',
+        allowDecimal: false
       },
       {
         id: '2',
@@ -151,7 +152,8 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: 'Bebidas',
         taxRate: 0.18,
         taxType: 'calculated',
-        image: '/placeholder.svg'
+        image: '/placeholder.svg',
+        allowDecimal: false
       },
       {
         id: '3',
@@ -167,7 +169,8 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: 'Panadería',
         taxRate: 0.18,
         taxType: 'included',
-        image: '/placeholder.svg'
+        image: '/placeholder.svg',
+        allowDecimal: false
       },
       {
         id: '4',
@@ -183,7 +186,8 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: 'Bebidas',
         taxRate: 0.18,
         taxType: 'calculated',
-        image: '/placeholder.svg'
+        image: '/placeholder.svg',
+        allowDecimal: false
       },
       {
         id: '5',
@@ -199,7 +203,28 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         category: 'Medicina',
         taxRate: 0,
         taxType: 'exempt',
-        image: '/placeholder.svg'
+        image: '/placeholder.svg',
+        allowDecimal: false
+      },
+      {
+        id: '6',
+        name: 'Azúcar Morena',
+        description: 'Azúcar morena por libra',
+        barcode: '7501234567896',
+        sku: 'AZU-001',
+        price: 60.00,
+        wholesalePrice: 50.00,
+        cost: 35.00,
+        stock: 50.5,
+        minStock: 10,
+        category: 'Granos',
+        taxRate: 0.18,
+        taxType: 'calculated',
+        image: '/placeholder.svg',
+        isFractional: true,
+        allowDecimal: true,
+        unitOfMeasure: 'libra',
+        fractionalUnit: 'lb'
       }
     ];
     setProducts(sampleProducts);
@@ -286,7 +311,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return customers.find(c => c.id === id);
   };
 
-  // Cart functions with improved tax calculation
+  // Cart functions with improved fractional support
   const addToCart = (product: Product, quantity: number, isWholesale: boolean = false) => {
     setCart(prev => {
       const price = isWholesale && product.wholesalePrice ? product.wholesalePrice : product.price;
@@ -318,6 +343,12 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         quantity = product.stock;
       }
       
+      // Validar cantidad mínima para productos fraccionarios
+      const minQuantity = product.allowDecimal || product.isFractional ? 0.1 : 1;
+      if (quantity < minQuantity) {
+        quantity = minQuantity;
+      }
+      
       if (quantity <= 0) return prev;
       
       return [...prev, {
@@ -333,12 +364,14 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCartQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
+    const product = getProduct(productId);
+    const minQuantity = product?.allowDecimal || product?.isFractional ? 0.1 : 1;
+    
+    if (quantity < minQuantity) {
       removeFromCart(productId);
       return;
     }
 
-    const product = getProduct(productId);
     if (product && quantity > product.stock) {
       console.warn(`Stock insuficiente para ${product.name}. Stock disponible: ${product.stock}`);
       quantity = product.stock;
@@ -386,12 +419,46 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const { subtotal: cartSubtotal, tax: cartTax, total: cartTotal } = calculateCartTotals();
 
-  // Get specific sale
+  // Enhanced barcode processing with decimal quantity support
+  const processBarcodeCommand = (input: string) => {
+    // Verificar si es un comando de cantidad (+2, +3, +0.5, etc.)
+    const quantityMatch = input.match(/^\+(\d*\.?\d+)$/);
+    if (quantityMatch) {
+      const quantity = parseFloat(quantityMatch[1]);
+      setPendingQuantity(quantity);
+      toast.success(`Cantidad ${quantity} establecida para el próximo producto`);
+      return;
+    }
+
+    // Buscar producto por código de barras
+    const product = products.find(p => p.barcode === input || p.sku === input);
+    if (product) {
+      const quantity = pendingQuantity || 1;
+      
+      // Validar cantidad mínima para productos fraccionarios
+      const minQuantity = product.allowDecimal || product.isFractional ? 0.1 : 1;
+      const finalQuantity = Math.max(quantity, minQuantity);
+      
+      if (product.stock < finalQuantity) {
+        toast.error(`Stock insuficiente. Disponible: ${product.stock}`);
+        return;
+      }
+      
+      addToCart(product, finalQuantity);
+      const displayQuantity = product.allowDecimal || product.isFractional 
+        ? finalQuantity.toFixed(1) 
+        : finalQuantity.toString();
+      toast.success(`${product.name} agregado (${displayQuantity}${product.fractionalUnit ? ' ' + product.fractionalUnit : ''})`);
+      setPendingQuantity(null); // Resetear cantidad pendiente
+    } else {
+      toast.error('Producto no encontrado');
+    }
+  };
+
   const getSale = (id: string) => {
     return sales.find(s => s.id === id);
   };
 
-  // Credit Note functions
   const createCreditNote = (creditNote: Omit<CreditNote, 'id'>) => {
     const newCreditNoteId = `CN-${Date.now()}`;
     const newCreditNote: CreditNote = {
@@ -422,7 +489,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  // Credit functions
   const getCustomerCreditBalance = (customerId: string) => {
     const customer = getCustomer(customerId);
     return customer?.creditBalance || 0;
@@ -469,7 +535,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Supplier functions
   const addSupplier = (supplier: Omit<Supplier, 'id' | 'createdAt'>) => {
     const newSupplier: Supplier = {
       ...supplier,
@@ -487,7 +552,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return suppliers.find(s => s.id === id);
   };
 
-  // Purchase functions with enhanced tax handling
   const addPurchase = (purchase: Omit<Purchase, 'id' | 'userId'>) => {
     if (!currentUser) return;
     
@@ -499,7 +563,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setPurchases(prev => [...prev, newPurchase]);
     
-    // Auto create accounts payable for credit purchases
     if (purchase.paymentType === 'credit') {
       const supplier = getSupplier(purchase.supplierId);
       if (supplier) {
@@ -514,7 +577,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     
-    // Update product costs, stock and tax type if purchase is received
     if (purchase.status === 'received') {
       purchase.items.forEach(item => {
         const product = getProduct(item.productId);
@@ -559,7 +621,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return purchases.find(p => p.id === id);
   };
 
-  // Inventory Count functions
   const addInventoryCount = (count: Omit<InventoryCount, 'id' | 'userId'>) => {
     if (!currentUser) return;
     
@@ -575,7 +636,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setInventoryCounts(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
   };
 
-  // Return functions
   const processReturn = (saleId: string, items: ReturnedItem[]) => {
     if (!currentUser) return "";
     
@@ -612,7 +672,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return returnId;
   };
 
-  // Sales functions
   const completeSale = (sale: Omit<Sale, 'id'>) => {
     if (!currentUser) return null;
 
@@ -625,7 +684,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     setSales(prev => [...prev, newSale]);
     
-    // Auto create accounts receivable for credit sales
     if (newSale.status === 'credit' && newSale.customerId) {
       const customer = getCustomer(newSale.customerId);
       if (customer) {
@@ -633,7 +691,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           creditBalance: (customer.creditBalance || 0) + newSale.total
         });
         
-        // Create receivable account automatically
         const dueDate = newSale.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         createReceivableFromCreditSale(
           newSaleId,
@@ -645,7 +702,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     
-    // Credit Note processing
     const creditNotePayments = sale.payments.filter(p => p.type === 'credit-note');
     creditNotePayments.forEach(payment => {
       if (payment.creditNoteId) {
@@ -653,7 +709,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
     
-    // Cash entry if cash payment
     const cashPayments = sale.payments.filter(p => p.type === 'cash');
     if (cashPayments.length > 0 && currentUser) {
       const totalCash = cashPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -665,7 +720,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
     
-    // Update product stock
     sale.items.forEach(item => {
       const product = getProduct(item.productId);
       if (product) {
@@ -679,38 +733,10 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newSale;
   };
 
-  const processBarcodeCommand = (input: string) => {
-    // Verificar si es un comando de cantidad (+2, +3, etc.)
-    const quantityMatch = input.match(/^\+(\d+)$/);
-    if (quantityMatch) {
-      const quantity = parseInt(quantityMatch[1]);
-      setPendingQuantity(quantity);
-      toast.success(`Cantidad ${quantity} establecida para el próximo producto`);
-      return;
-    }
-
-    // Buscar producto por código de barras
-    const product = products.find(p => p.barcode === input || p.sku === input);
-    if (product) {
-      const quantity = pendingQuantity || 1;
-      if (product.stock < quantity) {
-        toast.error(`Stock insuficiente. Disponible: ${product.stock}`);
-        return;
-      }
-      
-      addToCart(product, quantity);
-      toast.success(`${product.name} agregado (${quantity})`);
-      setPendingQuantity(null); // Resetear cantidad pendiente
-    } else {
-      toast.error('Producto no encontrado');
-    }
-  };
-
   const addCashClosure = (closure: any) => {
     setCashClosures(prev => [...prev, { ...closure, id: Date.now().toString() }]);
   };
 
-  // Held Orders functions
   const holdCurrentOrder = (note?: string) => {
     if (cart.length === 0) {
       toast.error('No hay productos en el carrito para guardar');
@@ -769,7 +795,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  // Access Control
   const validateAccessKey = (action: string, key: string) => {
     return ACCESS_KEYS[action as keyof typeof ACCESS_KEYS] === key;
   };

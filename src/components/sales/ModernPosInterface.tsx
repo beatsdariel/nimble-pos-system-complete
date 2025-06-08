@@ -12,7 +12,8 @@ import QuickCustomerModal from './QuickCustomerModal';
 import CollectAccountModal from './CollectAccountModal';
 import CashClosureModal from '../cash/CashClosureModal';
 import AccessKeyModal from '../common/AccessKeyModal';
-import { ShoppingCart, Trash2, User, Clock, Receipt, Minus, Plus, BarChart3, UserPlus, DollarSign, Search, Calculator } from 'lucide-react';
+import QuantityInput from './QuantityInput';
+import { ShoppingCart, Trash2, User, Clock, Receipt, BarChart3, UserPlus, DollarSign, Search, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ModernPosInterfaceProps {
@@ -58,13 +59,12 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
   const [barcodeInput, setBarcodeInput] = useState('');
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<{action: string, callback: () => void} | null>(null);
-  const [holdOrderNote, setHoldOrderNote] = useState('');
 
   const selectedCustomerData = selectedCustomer && selectedCustomer !== 'no-customer' 
     ? getCustomer(selectedCustomer) 
     : null;
 
-  // Handle barcode submission
+  // Handle barcode submission with enhanced decimal support
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (barcodeInput.trim()) {
@@ -73,8 +73,37 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     }
   };
 
+  // Enhanced keyboard support for quantity modification
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle if not focused on an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (e.key === '+') {
+        e.preventDefault();
+        const inputElement = document.querySelector('[data-barcode-input]') as HTMLInputElement;
+        if (inputElement) {
+          inputElement.focus();
+          inputElement.value = '+';
+          setBarcodeInput('+');
+        }
+      } else if (e.key === 'Enter' && cart.length > 0) {
+        e.preventDefault();
+        onShowPayment();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, [cart.length, onShowPayment]);
+
   const handleQuantityChange = (productId: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
+    const product = getProduct(productId);
+    const minQuantity = product?.allowDecimal || product?.isFractional ? 0.1 : 1;
+    
+    if (newQuantity < minQuantity) {
       removeFromCart(productId);
       toast.success('Producto eliminado del carrito');
     } else {
@@ -155,13 +184,19 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             <form onSubmit={handleBarcodeSubmit} className="flex gap-2">
               <Input
                 type="text"
-                placeholder="Código/+cantidad (ej: +2)"
+                placeholder="Código/+cantidad (ej: +2, +0.5)"
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                className="w-48"
+                className="w-56"
+                data-barcode-input
+                autoFocus
               />
               <Button type="submit" size="sm">Agregar</Button>
             </form>
+            <div className="text-sm text-gray-600">
+              <p>Tip: Usa '+' + cantidad para establecer cantidad (ej: +0.5)</p>
+              <p>Presiona Enter en cantidad para confirmar</p>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">
@@ -225,65 +260,72 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               </div>
             ) : (
               <div className="space-y-0">
-                {cart.map((item, index) => (
-                  <div key={`${item.productId}-${item.isWholesalePrice}`} 
-                       className={`grid grid-cols-12 gap-4 px-6 py-3 border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                    {/* Cantidad */}
-                    <div className="col-span-1 flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuantityChange(item.productId, item.quantity - 1)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <Input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleQuantityChange(item.productId, parseInt(e.target.value) || 1)}
-                        className="w-12 h-6 text-center text-xs"
-                        min="1"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuantityChange(item.productId, item.quantity + 1)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
+                {cart.map((item, index) => {
+                  const product = getProduct(item.productId);
+                  const allowDecimal = product?.allowDecimal || product?.isFractional || false;
+                  const step = allowDecimal ? 0.1 : 1;
+                  const min = allowDecimal ? 0.1 : 1;
+                  
+                  return (
+                    <div key={`${item.productId}-${item.isWholesalePrice}`} 
+                         className={`grid grid-cols-12 gap-4 px-6 py-3 border-b hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                      {/* Cantidad con soporte mejorado para decimales */}
+                      <div className="col-span-1 flex items-center">
+                        <QuantityInput
+                          value={item.quantity}
+                          onChange={(newQuantity) => handleQuantityChange(item.productId, newQuantity)}
+                          max={product?.stock || 999999}
+                          min={min}
+                          step={step}
+                          allowDecimal={allowDecimal}
+                          onEnterPress={() => {
+                            toast.success('Cantidad confirmada');
+                          }}
+                        />
+                      </div>
+                      
+                      {/* Descripción */}
+                      <div className="col-span-6">
+                        <div className="font-medium text-sm">{item.name}</div>
+                        <div className="flex gap-2 mt-1">
+                          {item.isWholesalePrice && (
+                            <Badge variant="secondary" className="text-xs">Mayoreo</Badge>
+                          )}
+                          {allowDecimal && (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-600">
+                              Decimal
+                            </Badge>
+                          )}
+                          {product?.fractionalUnit && (
+                            <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                              {product.fractionalUnit}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Precio */}
+                      <div className="col-span-2 text-sm">
+                        RD$ {item.price.toLocaleString()}
+                      </div>
+                      
+                      {/* Total */}
+                      <div className="col-span-3 flex justify-between items-center">
+                        <span className="font-medium text-sm">
+                          RD$ {(item.price * item.quantity).toLocaleString()}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromCart(item.productId)}
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                    
-                    {/* Descripción */}
-                    <div className="col-span-6">
-                      <div className="font-medium text-sm">{item.name}</div>
-                      {item.isWholesalePrice && (
-                        <Badge variant="secondary" className="text-xs mt-1">Mayoreo</Badge>
-                      )}
-                    </div>
-                    
-                    {/* Precio */}
-                    <div className="col-span-2 text-sm">
-                      RD$ {item.price.toLocaleString()}
-                    </div>
-                    
-                    {/* Total */}
-                    <div className="col-span-3 flex justify-between items-center">
-                      <span className="font-medium text-sm">
-                        RD$ {(item.price * item.quantity).toLocaleString()}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFromCart(item.productId)}
-                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -319,7 +361,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             <div className="flex justify-between items-center">
               <div className="text-sm">
                 <span className="font-medium">Total de Ítems: </span>
-                <span>{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>
+                <span>{cart.reduce((sum, item) => sum + item.quantity, 0).toFixed(2)}</span>
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold">

@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { usePos } from '@/contexts/PosContext';
-import { Search, Package, Plus, Minus, ShoppingCart } from 'lucide-react';
+import { Search, Package, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
+import QuantityInput from './QuantityInput';
 
 interface CentralProductSearchProps {
   useWholesalePrices: boolean;
@@ -40,13 +41,22 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
   }, [searchTerm, products]);
 
   const handleAddToCart = (product: any, quantity: number = 1) => {
-    if (product.stock < quantity) {
+    const minQuantity = product.allowDecimal || product.isFractional ? 0.1 : 1;
+    const finalQuantity = Math.max(quantity, minQuantity);
+    
+    if (product.stock < finalQuantity) {
       toast.error(`Stock insuficiente. Disponible: ${product.stock}`);
       return;
     }
 
-    addToCart(product, quantity, useWholesalePrices);
-    toast.success(`${product.name} agregado al carrito (${quantity})`);
+    addToCart(product, finalQuantity, useWholesalePrices);
+    
+    const displayQuantity = product.allowDecimal || product.isFractional 
+      ? finalQuantity.toFixed(1) 
+      : finalQuantity.toString();
+    const unit = product.fractionalUnit ? ` ${product.fractionalUnit}` : '';
+    
+    toast.success(`${product.name} agregado al carrito (${displayQuantity}${unit})`);
     
     // Clear search and results
     setSearchTerm('');
@@ -54,15 +64,13 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
     setQuantities({});
   };
 
-  const handleQuantityChange = (productId: string, delta: number) => {
-    const currentQty = quantities[productId] || 1;
-    const newQty = Math.max(1, currentQty + delta);
+  const handleQuantityChange = (productId: string, newQuantity: number) => {
     const product = products.find(p => p.id === productId);
     
-    if (product && newQty <= product.stock) {
+    if (product && newQuantity <= product.stock) {
       setQuantities(prev => ({
         ...prev,
-        [productId]: newQty
+        [productId]: newQuantity
       }));
     } else if (product) {
       toast.error(`Stock máximo disponible: ${product.stock}`);
@@ -78,7 +86,9 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && searchResults.length === 1) {
-      handleAddToCart(searchResults[0]);
+      const product = searchResults[0];
+      const quantity = quantities[product.id] || (product.allowDecimal || product.isFractional ? 1.0 : 1);
+      handleAddToCart(product, quantity);
     }
   };
 
@@ -116,10 +126,14 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
         <Card className="absolute top-full left-0 right-0 z-50 mt-1 max-h-96 overflow-y-auto shadow-lg">
           <CardContent className="p-0">
             {searchResults.map((product) => {
-              const quantity = quantities[product.id] || 1;
+              const allowDecimal = product.allowDecimal || product.isFractional;
+              const defaultQuantity = allowDecimal ? 1.0 : 1;
+              const quantity = quantities[product.id] || defaultQuantity;
               const displayPrice = getDisplayPrice(product);
               const isOutOfStock = product.stock === 0;
               const isLowStock = product.stock <= product.minStock && product.stock > 0;
+              const step = allowDecimal ? 0.1 : 1;
+              const min = allowDecimal ? 0.1 : 1;
 
               return (
                 <div
@@ -159,15 +173,28 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
                           <span className="font-semibold text-lg">
                             RD$ {displayPrice.toLocaleString()}
                           </span>
-                          {useWholesalePrices && product.wholesalePrice && (
-                            <Badge variant="secondary" className="text-xs">
-                              Mayoreo
-                            </Badge>
-                          )}
+                          <div className="flex flex-col gap-1">
+                            {useWholesalePrices && product.wholesalePrice && (
+                              <Badge variant="secondary" className="text-xs">
+                                Mayoreo
+                              </Badge>
+                            )}
+                            {allowDecimal && (
+                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-600">
+                                Decimal
+                              </Badge>
+                            )}
+                            {product.fractionalUnit && (
+                              <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                                {product.fractionalUnit}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-sm text-gray-500">
-                            Stock: {product.stock}
+                            Stock: {allowDecimal ? product.stock.toFixed(1) : product.stock}
+                            {product.fractionalUnit ? ` ${product.fractionalUnit}` : ''}
                           </span>
                           {isLowStock && (
                             <Badge variant="destructive" className="text-xs">
@@ -184,29 +211,14 @@ const CentralProductSearch: React.FC<CentralProductSearchProps> = ({
 
                       {/* Quantity Controls */}
                       {!isOutOfStock && (
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleQuantityChange(product.id, -1)}
-                            disabled={quantity <= 1}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-8 text-center font-medium">
-                            {quantity}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleQuantityChange(product.id, 1)}
-                            disabled={quantity >= product.stock}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        <QuantityInput
+                          value={quantity}
+                          onChange={(newQuantity) => handleQuantityChange(product.id, newQuantity)}
+                          max={product.stock}
+                          min={min}
+                          step={step}
+                          allowDecimal={allowDecimal}
+                        />
                       )}
 
                       {/* Add to Cart Button */}
