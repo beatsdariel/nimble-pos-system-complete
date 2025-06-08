@@ -30,7 +30,7 @@ const CollectAccountModal: React.FC<CollectAccountModalProps> = ({ open, onClose
 
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.documentId?.toLowerCase().includes(searchTerm.toLowerCase())
+    customer.document?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   useEffect(() => {
@@ -208,7 +208,7 @@ const CollectAccountModal: React.FC<CollectAccountModalProps> = ({ open, onClose
                           <div className="flex justify-between items-center">
                             <div>
                               <h4 className="font-medium">{customer.name}</h4>
-                              <p className="text-sm text-gray-500">{customer.documentId}</p>
+                              <p className="text-sm text-gray-500">{customer.document}</p>
                             </div>
                             <Badge variant="destructive">
                               RD$ {totalDebt.toLocaleString()}

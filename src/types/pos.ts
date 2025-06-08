@@ -9,15 +9,17 @@ export interface Product {
   cost: number;
   stock: number;
   minStock: number;
+  maxStock?: number;
   category: string;
   taxRate: number;
-  taxType?: 'included' | 'calculated' | 'exempt';
+  taxType?: 'included' | 'excluded' | 'exempt';
   image?: string;
   supplier?: string;
   isFractional?: boolean;
   unitOfMeasure?: 'caja' | 'paquete' | 'libra' | 'unidad' | 'metro' | 'kilogramo';
   fractionalUnit?: string;
-  allowDecimal?: boolean; // Nueva propiedad para permitir decimales
+  allowDecimal?: boolean;
+  hasTax?: boolean;
 }
 
 export interface Customer {
