@@ -2,24 +2,22 @@ export interface Product {
   id: string;
   name: string;
   description: string;
-  barcode: string;
   sku: string;
+  barcode: string;
   price: number;
+  cost?: number;
   wholesalePrice?: number;
-  cost: number;
   stock: number;
-  minStock: number;
+  minStock?: number;
   maxStock?: number;
   category: string;
   taxRate: number;
-  taxType?: 'included' | 'excluded' | 'exempt';
-  image?: string;
-  supplier?: string;
-  isFractional?: boolean;
-  unitOfMeasure?: 'caja' | 'paquete' | 'libra' | 'unidad' | 'metro' | 'kilogramo';
-  fractionalUnit?: string;
+  taxType: 'included' | 'excluded' | 'exempt';
   allowDecimal?: boolean;
+  isFractional?: boolean;
+  fractionalUnit?: string;
   hasTax?: boolean;
+  unitOfMeasure?: 'libra' | 'unidad' | 'caja';
 }
 
 export interface Customer {
