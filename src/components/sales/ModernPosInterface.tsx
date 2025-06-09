@@ -13,7 +13,8 @@ import CollectAccountModal from './CollectAccountModal';
 import CashClosureModal from '../cash/CashClosureModal';
 import AccessKeyModal from '../common/AccessKeyModal';
 import QuantityInput from './QuantityInput';
-import { ShoppingCart, Trash2, User, Clock, Receipt, BarChart3, UserPlus, DollarSign, Search, Calculator } from 'lucide-react';
+import ShoppingCart from './ShoppingCart';
+import { ShoppingCart as ShoppingCartIcon, Trash2, User, Clock, Receipt, BarChart3, UserPlus, DollarSign, Search, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ModernPosInterfaceProps {
@@ -104,7 +105,6 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     
     if (newQuantity < minQuantity) {
       removeFromCart(productId);
-      // Remove notification
     } else {
       updateCartQuantity(productId, newQuantity);
     }
@@ -182,7 +182,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Header Fijo */}
+      {/* Fixed Header - Barcode Input */}
       <div className="bg-card shadow-sm border-b border-border px-6 py-3 flex-shrink-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-6">
@@ -230,7 +230,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Barra de Búsqueda Fija */}
+      {/* Fixed Search Bar */}
       <div className="bg-card px-6 py-3 border-b border-border flex-shrink-0">
         <CentralProductSearch 
           useWholesalePrices={useWholesalePrices}
@@ -240,15 +240,15 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
         />
       </div>
 
-      {/* Contenido Principal - Layout Fijo con altura máxima para evitar overflow */}
+      {/* Main Content Area - Fixed Layout */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Área del Carrito - Fija */}
-        <div className="flex-1 flex flex-col bg-card min-h-0">
-          {/* Header del Carrito */}
+        {/* Shopping Cart Area - Fixed Width */}
+        <div className="w-2/3 flex flex-col bg-card min-h-0 border-r border-border">
+          {/* Cart Header */}
           <div className="bg-yellow-600 px-6 py-2 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-black-900" />
+                <ShoppingCartIcon className="h-5 w-5 text-black-900" />
                 <span className="font-semibold text-black-900">Carrito de Compras</span>
               </div>
               <Badge variant="secondary" className="bg-black-900 text-yellow-500 border border-yellow-300">
@@ -257,102 +257,12 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Headers de Tabla */}
-          <div className="bg-black-800 text-yellow-50 px-6 py-2 flex-shrink-0">
-            <div className="grid grid-cols-12 gap-4 text-sm font-medium">
-              <div className="col-span-1">CANT.</div>
-              <div className="col-span-6">DESCRIPCIÓN</div>
-              <div className="col-span-2">PRECIO</div>
-              <div className="col-span-3">IMPORTE</div>
-            </div>
+          {/* Cart Content */}
+          <div className="flex-1 min-h-0 p-4">
+            <ShoppingCart />
           </div>
 
-          {/* Lista de Productos - Scrollable con altura controlada */}
-          <div className="flex-1 overflow-y-auto min-h-0">
-            {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-black-400">
-                <ShoppingCart className="h-16 w-16 mb-4" />
-                <p className="text-xl font-medium">Carrito vacío</p>
-                <p className="text-sm">Busca productos para agregar</p>
-              </div>
-            ) : (
-              <div className="space-y-0">
-                {cart.map((item, index) => {
-                  const product = getProduct(item.productId);
-                  const allowDecimal = product?.allowDecimal || product?.isFractional || false;
-                  const step = allowDecimal ? 0.1 : 1;
-                  const min = allowDecimal ? 0.1 : 1;
-                  
-                  return (
-                    <div key={`${item.productId}-${item.isWholesalePrice}`} 
-                         className={`grid grid-cols-12 gap-4 px-6 py-3 border-b border-border hover:bg-yellow-50 ${index % 2 === 0 ? 'bg-card' : 'bg-yellow-50/20'}`}>
-                      {/* Cantidad con validación de stock mejorada */}
-                      <div className="col-span-1 flex items-center">
-                        <QuantityInput
-                          value={item.quantity}
-                          onChange={(newQuantity) => handleQuantityChange(item.productId, newQuantity)}
-                          max={product?.stock || 999999}
-                          min={min}
-                          step={step}
-                          allowDecimal={allowDecimal}
-                          onEnterPress={() => {
-                            // Remove confirmation notification
-                          }}
-                        />
-                      </div>
-                      
-                      {/* Descripción */}
-                      <div className="col-span-6">
-                        <div className="font-medium text-sm text-foreground">{item.name}</div>
-                        <div className="flex gap-2 mt-1">
-                          {item.isWholesalePrice && (
-                            <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800 border-yellow-300">Mayoreo</Badge>
-                          )}
-                          {allowDecimal && (
-                            <Badge variant="outline" className="text-xs text-yellow-700 border-yellow-500">
-                              Decimal
-                            </Badge>
-                          )}
-                          {product?.fractionalUnit && (
-                            <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-400">
-                              {product.fractionalUnit}
-                            </Badge>
-                          )}
-                          {product && (
-                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">
-                              Stock: {product.stock}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Precio */}
-                      <div className="col-span-2 text-sm text-foreground">
-                        RD$ {item.price.toLocaleString()}
-                      </div>
-                      
-                      {/* Total */}
-                      <div className="col-span-3 flex justify-between items-center">
-                        <span className="font-medium text-sm text-foreground">
-                          RD$ {(item.price * item.quantity).toLocaleString()}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFromCart(item.productId)}
-                          className="h-6 w-6 p-0 text-destructive hover:text-destructive/80"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Footer Info - Fijo */}
+          {/* Footer Info */}
           <div className="bg-yellow-100 px-6 py-2 border-t border-yellow-300 flex-shrink-0">
             <div className="grid grid-cols-5 gap-4 text-sm text-black-700">
               <div>
@@ -378,33 +288,30 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Total Section - Fijo */}
-          <div className="bg-card px-6 py-3 border-t border-border flex-shrink-0">
-            <div className="flex justify-between items-center">
-              <div className="text-sm text-black-400">
-                <span className="font-medium">Total de Ítems: </span>
-                <span>{cart.reduce((sum, item) => sum + item.quantity, 0).toFixed(2)}</span>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-yellow-600">
-                  TOTAL A PAGAR: RD$ {cartTotal.toLocaleString()}
-                </div>
-              </div>
+          {/* Checkout Button - Always visible */}
+          {cart.length > 0 && (
+            <div className="p-4 flex-shrink-0 border-t border-border bg-card">
+              <Button
+                onClick={onShowPayment}
+                className="w-full h-12 text-lg font-semibold bg-yellow-600 hover:bg-yellow-700 text-black-900"
+              >
+                💳 PROCESAR PAGO
+              </Button>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Panel Lateral de Acciones - Fijo con scroll controlado */}
-        <div className="w-80 bg-card border-l border-border flex flex-col flex-shrink-0 min-h-0">
+        {/* Actions Panel - Fixed Width */}
+        <div className="w-1/3 bg-card flex flex-col flex-shrink-0 min-h-0">
           {/* Header */}
           <div className="bg-yellow-600 text-black-900 px-4 py-3 text-center flex-shrink-0">
             <div className="flex items-center justify-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              <span className="font-semibold">Punto de Venta</span>
+              <span className="font-semibold">Acciones</span>
             </div>
           </div>
 
-          {/* Contenido Scrollable con altura controlada */}
+          {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {/* Customer Management */}
             <div className="p-4 border-b border-border space-y-3">
@@ -499,22 +406,10 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
               </Button>
             </div>
           </div>
-
-          {/* Checkout Button - Siempre visible en la parte inferior */}
-          {cart.length > 0 && (
-            <div className="p-4 flex-shrink-0 border-t border-border bg-card">
-              <Button
-                onClick={onShowPayment}
-                className="w-full h-12 text-lg font-semibold bg-yellow-600 hover:bg-yellow-700 text-black-900"
-              >
-                💳 PROCESAR PAGO
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Modals with improved z-index and positioning */}
+      {/* Modals */}
       <HoldOrderManager
         open={showHoldOrders}
         onClose={() => setShowHoldOrders(false)}

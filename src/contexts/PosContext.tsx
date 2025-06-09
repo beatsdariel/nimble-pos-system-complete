@@ -248,11 +248,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     setLastAddedProductId(productId);
-    
-    // Don't update product stock here - only update on sale completion
-    // setProducts(prev => prev.map(p => 
-    //   p.id === productId ? { ...p, stock: p.stock - quantity } : p
-    // ));
+    // Remove toast notification for product added
   };
 
   const processBarcodeCommand = (input: string): void => {
@@ -281,7 +277,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           
           updateCartQuantity(lastAddedProductId, finalQuantity);
-          // Remove the "último agregado" notification
+          // Remove toast notification for quantity update
         } else {
           toast.error('Producto no encontrado');
         }
@@ -295,7 +291,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (product) {
       if (product.stock > 0) {
         addToCart(product.id, 1);
-        // Remove the "agregado al carrito" notification
+        // Remove toast notification for product found and added
       } else {
         toast.error('Producto sin stock');
       }
