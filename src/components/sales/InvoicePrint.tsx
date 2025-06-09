@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Sale, Customer } from '@/types/pos';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -60,7 +59,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
       const totalAmount = item.price * item.quantity;
       
       // Si el producto no tiene ITBIS, no calcular impuesto
-      if (!product?.hasTax || product.hasTax === false) {
+      if (!product?.hasTax) {
         return {
           ...item,
           basePrice: item.price,
