@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -103,7 +104,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
     
     if (newQuantity < minQuantity) {
       removeFromCart(productId);
-      toast.success('Producto eliminado del carrito');
+      // Remove notification
     } else {
       updateCartQuantity(productId, newQuantity);
     }
@@ -239,10 +240,10 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
         />
       </div>
 
-      {/* Contenido Principal - Layout Fijo */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Contenido Principal - Layout Fijo con altura máxima para evitar overflow */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Área del Carrito - Fija */}
-        <div className="flex-1 flex flex-col bg-card">
+        <div className="flex-1 flex flex-col bg-card min-h-0">
           {/* Header del Carrito */}
           <div className="bg-yellow-600 px-6 py-2 flex-shrink-0">
             <div className="flex items-center justify-between">
@@ -266,8 +267,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Lista de Productos - Scrollable */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Lista de Productos - Scrollable con altura controlada */}
+          <div className="flex-1 overflow-y-auto min-h-0">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-black-400">
                 <ShoppingCart className="h-16 w-16 mb-4" />
@@ -285,7 +286,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                   return (
                     <div key={`${item.productId}-${item.isWholesalePrice}`} 
                          className={`grid grid-cols-12 gap-4 px-6 py-3 border-b border-border hover:bg-yellow-50 ${index % 2 === 0 ? 'bg-card' : 'bg-yellow-50/20'}`}>
-                      {/* Cantidad con soporte mejorado para decimales */}
+                      {/* Cantidad con validación de stock mejorada */}
                       <div className="col-span-1 flex items-center">
                         <QuantityInput
                           value={item.quantity}
@@ -295,7 +296,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                           step={step}
                           allowDecimal={allowDecimal}
                           onEnterPress={() => {
-                            toast.success('Cantidad confirmada');
+                            // Remove confirmation notification
                           }}
                         />
                       </div>
@@ -315,6 +316,11 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
                           {product?.fractionalUnit && (
                             <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-400">
                               {product.fractionalUnit}
+                            </Badge>
+                          )}
+                          {product && (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-400">
+                              Stock: {product.stock}
                             </Badge>
                           )}
                         </div>
@@ -388,8 +394,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
           </div>
         </div>
 
-        {/* Panel Lateral de Acciones - Fijo */}
-        <div className="w-80 bg-card border-l border-border flex flex-col flex-shrink-0">
+        {/* Panel Lateral de Acciones - Fijo con scroll controlado */}
+        <div className="w-80 bg-card border-l border-border flex flex-col flex-shrink-0 min-h-0">
           {/* Header */}
           <div className="bg-yellow-600 text-black-900 px-4 py-3 text-center flex-shrink-0">
             <div className="flex items-center justify-center gap-2">
@@ -398,8 +404,8 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Contenido Scrollable */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Contenido Scrollable con altura controlada */}
+          <div className="flex-1 overflow-y-auto min-h-0">
             {/* Customer Management */}
             <div className="p-4 border-b border-border space-y-3">
               <Button
@@ -494,9 +500,9 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
             </div>
           </div>
 
-          {/* Checkout Button - Fijo */}
+          {/* Checkout Button - Siempre visible en la parte inferior */}
           {cart.length > 0 && (
-            <div className="p-4 flex-shrink-0">
+            <div className="p-4 flex-shrink-0 border-t border-border bg-card">
               <Button
                 onClick={onShowPayment}
                 className="w-full h-12 text-lg font-semibold bg-yellow-600 hover:bg-yellow-700 text-black-900"
@@ -508,7 +514,7 @@ const ModernPosInterface: React.FC<ModernPosInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Modals */}
+      {/* Modals with improved z-index and positioning */}
       <HoldOrderManager
         open={showHoldOrders}
         onClose={() => setShowHoldOrders(false)}

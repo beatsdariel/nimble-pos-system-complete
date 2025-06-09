@@ -129,7 +129,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const product = products.find(p => p.id === item.productId);
     
     // Only calculate tax if the product has tax enabled (hasTax !== false)
-    if (!product || product.hasTax === false) {
+    if (!product || !product.hasTax) {
       return sum; // No tax for this item
     }
 
@@ -204,8 +204,15 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    if (product.stock < quantity) {
-      toast.error('Stock insuficiente');
+    // Enhanced stock validation - check current cart quantities
+    const currentCartQuantity = cart
+      .filter(item => item.productId === productId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+    
+    const totalRequestedQuantity = currentCartQuantity + quantity;
+    
+    if (totalRequestedQuantity > product.stock) {
+      toast.error(`Stock insuficiente. Disponible: ${product.stock}, En carrito: ${currentCartQuantity}`);
       return;
     }
 
@@ -242,9 +249,10 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setLastAddedProductId(productId);
     
-    setProducts(prev => prev.map(p => 
-      p.id === productId ? { ...p, stock: p.stock - quantity } : p
-    ));
+    // Don't update product stock here - only update on sale completion
+    // setProducts(prev => prev.map(p => 
+    //   p.id === productId ? { ...p, stock: p.stock - quantity } : p
+    // ));
   };
 
   const processBarcodeCommand = (input: string): void => {
@@ -265,8 +273,15 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const allowDecimal = product.allowDecimal || product.isFractional;
           const finalQuantity = allowDecimal ? quantity : Math.round(quantity);
           
+          // Enhanced stock validation for quantity updates
+          const currentCartItem = cart.find(item => item.productId === lastAddedProductId);
+          if (currentCartItem && finalQuantity > product.stock) {
+            toast.error(`Stock insuficiente. Disponible: ${product.stock}`);
+            return;
+          }
+          
           updateCartQuantity(lastAddedProductId, finalQuantity);
-          toast.success(`Cantidad actualizada: ${finalQuantity} ${product.fractionalUnit || 'unidades'} de ${product.name}`);
+          // Remove the "último agregado" notification
         } else {
           toast.error('Producto no encontrado');
         }
@@ -280,7 +295,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (product) {
       if (product.stock > 0) {
         addToCart(product.id, 1);
-        toast.success(`${product.name} agregado al carrito`);
+        // Remove the "agregado al carrito" notification
       } else {
         toast.error('Producto sin stock');
       }
@@ -305,6 +320,12 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const product = getProduct(productId);
     if (!product) {
       toast.error('Producto no encontrado');
+      return;
+    }
+
+    // Enhanced stock validation for quantity updates
+    if (quantity > product.stock) {
+      toast.error(`Stock insuficiente. Disponible: ${product.stock}`);
       return;
     }
 
